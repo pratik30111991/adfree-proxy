@@ -1,40 +1,37 @@
-# --- add at top if not already ---
+import logging
 import requests
 from urllib.parse import urlparse
-# -------------------------------
+from flask import Flask, render_template, request, jsonify, Response
+import yt_dlp
 
-# Replace your existing get_video_info function with this one:
+# Flask app
+app = Flask(__name__)
 
+# ------------------------
+# Invidious Instances
+# ------------------------
 INVIDIOUS_INSTANCES = [
     "https://yewtu.cafe",
-    "https://yewtu.cafe",            # duplicate intentionally low - add more if you know
-    "https://yewtu.eu",             # example instances — availability varies
-    "https://yewtu.herokuapp.com",
-    "https://yewtu.privacy.com",    # note: some of these are placeholders; add working ones you find
-    "https://yewtu.snopyta.org",
+    "https://yewtu.eu",
     "https://yewtu.kavin.rocks",
     "https://yewtu.zcodex.org"
 ]
 
 def parse_video_id(url):
-    # Extract video id from common youtube URL formats
     try:
         u = url.strip()
         if "youtu.be/" in u:
             return u.split("youtu.be/")[1].split("?")[0].split("&")[0]
         if "watch" in u and "v=" in u:
             return urlparse(u).query.split("v=")[1].split("&")[0]
-        # fallback naive
         return u.split("/")[-1].split("?")[0]
     except:
         return None
 
 def formats_from_invidious_json(j):
     fmts = []
-    # Invidious returns 'formats' or 'adaptiveFormats' depending on instance
     cand = j.get("formats") or j.get("adaptiveFormats") or []
     for f in cand:
-        # Build minimal format fields used by frontend: format_id, ext, resolution, filesize
         fid = f.get("itag") or f.get("format_id") or str(f.get("contentLength", ""))[:6]
         ext = f.get("mimeType", "").split("/")[1].split(";")[0] if f.get("mimeType") else f.get("ext", "mp4")
         res = f.get("qualityLabel") or f.get("resolution") or f.get("quality")
@@ -50,9 +47,8 @@ def formats_from_invidious_json(j):
             "resolution": res or "unknown",
             "filesize": filesz or 0
         })
-    # dedupe and sort by resolution (attempt)
-    seen = set()
-    out = []
+    # dedupe
+    seen, out = set(), []
     for ff in fmts:
         key = (ff["resolution"], ff["ext"], ff["format_id"])
         if key in seen:
@@ -62,42 +58,32 @@ def formats_from_invidious_json(j):
     return out
 
 def try_invidious(video_id):
-    """Try multiple Invidious instances to fetch video info. Return dict similar to yt-dlp output or raise."""
     errors = []
     for inst in INVIDIOUS_INSTANCES:
         try:
             api = inst.rstrip("/") + f"/api/v1/videos/{video_id}"
-            resp = requests.get(api, timeout=10, headers={"User-Agent":"Mozilla/5.0"})
+            resp = requests.get(api, timeout=10, headers={"User-Agent": "Mozilla/5.0"})
             if resp.status_code != 200:
                 errors.append(f"{inst} status {resp.status_code}")
                 continue
             j = resp.json()
-            # Some instances return 'error' field
             if isinstance(j, dict) and j.get("error"):
                 errors.append(f"{inst} err {j.get('error')}")
                 continue
             fmts = formats_from_invidious_json(j)
             return {
                 "id": j.get("videoId") or video_id,
-                "title": j.get("title") or j.get("video_title") or f"yt:{video_id}",
+                "title": j.get("title") or f"yt:{video_id}",
                 "formats": fmts,
-                "duration": j.get("lengthSeconds") or j.get("duration"),
-                "next_videos": []  # Invidious may have related videos in 'related'
+                "duration": j.get("lengthSeconds"),
+                "next_videos": []
             }
         except Exception as e:
             errors.append(f"{inst} exc {e}")
             continue
     raise Exception("Invidious fallbacks failed: " + " | ".join(errors))
 
-
 def get_video_info(url):
-    """
-    Robust video info fetcher:
-    1) Try yt-dlp (best effort)
-    2) If yt-dlp fails due to sign-in/bot check, try Invidious instances automatically
-    Returns: { id, title, formats:[{format_id, ext, resolution, filesize}], duration, next_videos }
-    """
-    # 1) Try yt-dlp first
     ydl_opts = {
         "quiet": True,
         "skip_download": True,
@@ -109,10 +95,8 @@ def get_video_info(url):
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=False)
-            # Build formats similar to previous
             formats = []
             for f in info.get("formats", []):
-                # keep only playable combined or video+audio adaptive (as earlier)
                 if f.get("acodec") != "none" and f.get("vcodec") != "none":
                     fmt = {
                         "format_id": f.get("format_id"),
@@ -131,19 +115,51 @@ def get_video_info(url):
     except Exception as e:
         errstr = str(e)
         logging.warning(f"yt-dlp failed: {errstr}")
-        # Detect sign-in/bot related messages
-        if "Sign in to confirm" in errstr or "not a bot" in errstr or "cookies" in errstr or "This video is unavailable" in errstr:
-            # Attempt invidious fallbacks
-            vid = parse_video_id(url)
-            if not vid:
-                raise Exception("Cannot parse video id and yt-dlp failed: " + errstr)
-            logging.info(f"Attempting Invidious fallbacks for {vid}")
-            try:
-                return try_invidious(vid)
-            except Exception as inv_err:
-                logging.error(f"Invidious fallback failed: {inv_err}")
-                # Raise original yt-dlp error plus fallback details
-                raise Exception(f"yt-dlp error: {errstr} ; Invidious fallback error: {inv_err}")
-        else:
-            # for other errors, re-raise
-            raise
+        vid = parse_video_id(url)
+        if not vid:
+            raise Exception("Cannot parse video id and yt-dlp failed: " + errstr)
+        return try_invidious(vid)
+
+# ------------------------
+# Routes
+# ------------------------
+
+@app.route("/")
+def index():
+    return render_template("index.html")
+
+@app.route("/proxy")
+def proxy_page():
+    return render_template("proxy.html")
+
+@app.route("/get_video", methods=["POST"])
+def get_video():
+    data = request.get_json()
+    url = data.get("url")
+    try:
+        info = get_video_info(url)
+        return jsonify(info)
+    except Exception as e:
+        return jsonify({"error": str(e)})
+
+@app.route("/log_play", methods=["POST"])
+def log_play():
+    data = request.get_json()
+    logging.info(f"PLAY LOG: {data}")
+    return jsonify({"status": "ok"})
+
+@app.route("/proxytool")
+def proxytool():
+    site = request.args.get("site")
+    if not site:
+        return "No site given", 400
+    try:
+        resp = requests.get(site, timeout=10)
+        return Response(resp.content, content_type=resp.headers.get("content-type", "text/html"))
+    except Exception as e:
+        return f"Proxy error: {e}", 500
+
+
+# Entry point
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5000)
