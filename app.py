@@ -4,19 +4,22 @@ from flask import Flask, render_template, request, jsonify
 import yt_dlp
 
 logging.basicConfig(level=logging.INFO)
+
 app = Flask(__name__)
 
 def fetch_video_info(url):
+    """Fetch video info + playlist using yt-dlp"""
     ydl_opts = {
         "quiet": True,
         "skip_download": True,
-        "extract_flat": True,
         "forcejson": True,
-        "format": "bestvideo+bestaudio/best"
+        "format": "bestvideo+bestaudio/best",
     }
+
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(url, download=False)
-    
+
+    # Current video
     current = {
         "id": info.get("id"),
         "title": info.get("title"),
@@ -30,14 +33,26 @@ def fetch_video_info(url):
         ]
     }
 
+    # Full playlist / related videos if exists
     next_videos = []
     entries = info.get("entries") or []
-    for e in entries[:5]:
+    for e in entries:
+        if not e: 
+            continue
         next_videos.append({
             "id": e.get("id"),
-            "title": e.get("title")
+            "title": e.get("title"),
+            "formats": [
+                {
+                    "format_id": f.get("format_id"),
+                    "ext": f.get("ext"),
+                    "resolution": f.get("format_note") or f.get("resolution") or f.get("height") or "unknown",
+                    "filesize": round(f.get("filesize", 0)/1024/1024, 2)
+                } for f in e.get("formats", [])
+            ]
         })
 
+    logging.info(f"Fetched video: {current['title']}, playlist count: {len(next_videos)}")
     return {"current": current, "next_videos": next_videos}
 
 @app.route("/")
