@@ -1,5 +1,5 @@
 # app.py
-from flask import Flask, request, render_template_string, Response
+from flask import Flask, request, render_template, Response
 import requests
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin, quote, unquote
@@ -18,47 +18,17 @@ BLOCK_HOST_FRAGMENTS = [
     "adition", "media.net", "sponsored", "advert"
 ]
 
-FORM_HTML = """
-<!doctype html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <title>Ad-Free Proxy</title>
-  <style>
-    body{font-family:Arial,Helvetica,sans-serif;margin:28px}
-    input[type=text]{width:70%;padding:8px}
-    button{padding:8px 12px;margin-left:6px}
-    .note{color:#444;margin-top:12px;font-size:13px}
-    .frame{margin-top:18px;border:1px solid #ccc;padding:8px}
-  </style>
-</head>
-<body>
-  <h2>Ad-Free Proxy</h2>
-  <form method="GET" action="/">
-    <label>Enter Site URL:</label><br>
-    <input type="text" name="site" placeholder="https://example.com" value="{{ site|default('') }}" required>
-    <button type="submit">Load</button>
-    <button type="button" onclick="document.querySelector('input[name=site]').value=''">Clear</button>
-  </form>
+# ---------------------- ROUTES ----------------------
 
-  <div class="note">
-    Tip: include full URL (https://...). This proxy rewrites links/resources to keep browsing inside the proxy.
-    Heavy sites or video streaming (YouTube) may not work perfectly due to remote fetch/timeouts.
-  </div>
+@app.route("/")
+def home():
+    return render_template("index.html")   # YouTube Ad-Free Player page
 
-  {% if cleaned_html %}
-    <h3>Ad-free view (proxied):</h3>
-    <div class="frame">{{ cleaned_html|safe }}</div>
-  {% endif %}
-</body>
-</html>
-"""
-
-@app.route("/", methods=["GET"])
-def index():
+@app.route("/proxytool")
+def proxytool():
     site = request.args.get("site", "").strip()
     if not site:
-        return render_template_string(FORM_HTML, site=site)
+        return render_template("proxy.html", site=site)
 
     if not site.startswith("http://") and not site.startswith("https://"):
         site = "https://" + site
@@ -68,10 +38,10 @@ def index():
     try:
         cleaned = fetch_and_clean(site)
         logging.info(f"Successfully cleaned site: {site}")
-        return render_template_string(FORM_HTML, site=site, cleaned_html=cleaned)
+        return render_template("proxy.html", site=site, cleaned_html=cleaned)
     except Exception as e:
         logging.exception(f"Failed to fetch site: {site}")
-        return render_template_string(FORM_HTML, site=site, cleaned_html=f"<pre>Error: {e}</pre>")
+        return render_template("proxy.html", site=site, cleaned_html=f"<pre>Error: {e}</pre>")
 
 @app.route("/proxy")
 def proxy_resource():
@@ -97,6 +67,8 @@ def proxy_resource():
 @app.route("/health")
 def health():
     return "OK", 200
+
+# ---------------------- HELPERS ----------------------
 
 def is_blocked_host(url):
     u = url.lower()
@@ -154,7 +126,7 @@ def fetch_and_clean(url):
             href = tag["href"]
             if href.startswith("mailto:") or href.startswith("tel:"):
                 continue
-            tag["href"] = "/?site=" + quote(absolute_url(url, href), safe='')
+            tag["href"] = "/proxytool?site=" + quote(absolute_url(url, href), safe='')
         if tag.has_attr("src"):
             tag["src"] = rewrite_attr(url, tag["src"])
         if tag.has_attr("data-src"):
