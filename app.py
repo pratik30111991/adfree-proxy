@@ -1,149 +1,106 @@
-# app.py
-from flask import Flask, request, render_template, Response
-import requests
-from bs4 import BeautifulSoup
-from urllib.parse import urljoin, quote, unquote
+from flask import Flask, request, render_template, jsonify
+import yt_dlp
 import logging
 import os
+import json
 
 app = Flask(__name__)
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 
-BLOCK_HOST_FRAGMENTS = [
-    "doubleclick.net", "googlesyndication", "googleadservices", "pagead2.googlesyndication",
-    "google-analytics.com", "adservice.google.com", "adroll.com", "adcdn", "adsystem",
-    "taboola", "outbrain", "pubmatic", "revcontent", "bnc.lt", "quantserve", "adsrvr.org",
-    "serving-sys", "openx.net", "adform.net", "yahoo.com/ads", "adcolony", "unityads",
-    "moatads", "adnxs.com", "adsafeprotected.com", "scorecardresearch", "zedo.com",
-    "adition", "media.net", "sponsored", "advert"
-]
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    handlers=[
+        logging.FileHandler("adfree_player.log"),
+        logging.StreamHandler()
+    ]
+)
 
-# ---------------------- ROUTES ----------------------
+VIDEO_LOG_FILE = "video_log.json"
+
+def log_video(video_id, title, quality, size_mb, action):
+    try:
+        if os.path.exists(VIDEO_LOG_FILE):
+            with open(VIDEO_LOG_FILE, "r") as f:
+                log_data = json.load(f)
+        else:
+            log_data = []
+
+        log_entry = {
+            "video_id": video_id,
+            "title": title,
+            "quality": quality,
+            "size_mb": size_mb,
+            "action": action
+        }
+        log_data.append(log_entry)
+        with open(VIDEO_LOG_FILE, "w") as f:
+            json.dump(log_data, f, indent=2)
+        logging.info(f"{action} -> {title} ({video_id}) [{quality}] ~{size_mb}MB")
+    except Exception as e:
+        logging.error(f"Logging failed: {e}")
+
+def get_video_info(url):
+    ydl_opts = {
+        "quiet": True,
+        "skip_download": True,
+        "forcejson": True,
+        "simulate": True,
+        "format": "bestvideo+bestaudio/best",
+        "logger": logging.getLogger()
+    }
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        info = ydl.extract_info(url, download=False)
+        # Gather formats for quality selection
+        formats = []
+        for f in info.get("formats", []):
+            if f.get("acodec") != "none" and f.get("vcodec") != "none":
+                fmt = {
+                    "format_id": f.get("format_id"),
+                    "ext": f.get("ext"),
+                    "resolution": f.get("format_note") or f.get("resolution"),
+                    "filesize": round(f.get("filesize",0)/1024/1024, 2)  # MB
+                }
+                formats.append(fmt)
+        return {
+            "id": info.get("id"),
+            "title": info.get("title"),
+            "formats": formats,
+            "duration": info.get("duration"),
+            "next_videos": info.get("entries", [])  # for playlists
+        }
 
 @app.route("/")
-def home():
-    return render_template("index.html")   # YouTube Ad-Free Player page
+def index():
+    return render_template("index.html")
 
-@app.route("/proxytool")
-def proxytool():
-    site = request.args.get("site", "").strip()
-    if not site:
-        return render_template("proxy.html", site=site)
-
-    if not site.startswith("http://") and not site.startswith("https://"):
-        site = "https://" + site
-
-    logging.info(f"User requested site: {site}")
-
+@app.route("/get_video", methods=["POST"])
+def get_video():
+    data = request.json
+    url = data.get("url")
+    if not url:
+        return jsonify({"error": "No URL provided"}), 400
     try:
-        cleaned = fetch_and_clean(site)
-        logging.info(f"Successfully cleaned site: {site}")
-        return render_template("proxy.html", site=site, cleaned_html=cleaned)
+        info = get_video_info(url)
+        return jsonify(info)
     except Exception as e:
-        logging.exception(f"Failed to fetch site: {site}")
-        return render_template("proxy.html", site=site, cleaned_html=f"<pre>Error: {e}</pre>")
+        logging.error(f"Error fetching video: {e}")
+        return jsonify({"error": str(e)}), 500
 
-@app.route("/proxy")
-def proxy_resource():
-    raw_url = request.args.get("url", "")
-    if not raw_url:
-        return Response("Missing url", status=400)
-
-    url = unquote(raw_url)
-    if is_blocked_host(url):
-        logging.info(f"BLOCKED resource: {url}")
-        return Response("", status=204)
-
-    try:
-        headers = {"User-Agent": "Mozilla/5.0"}
-        r = requests.get(url, headers=headers, timeout=15, stream=True)
-        content_type = r.headers.get("Content-Type", "application/octet-stream")
-        logging.info(f"Proxied resource OK: {url} ({content_type})")
-        return Response(r.content, content_type=content_type)
-    except Exception as ex:
-        logging.exception(f"Proxy fetch failed: {url}")
-        return Response("", status=502)
+@app.route("/log_play", methods=["POST"])
+def log_play():
+    data = request.json
+    log_video(
+        video_id=data.get("video_id"),
+        title=data.get("title"),
+        quality=data.get("quality"),
+        size_mb=data.get("size_mb"),
+        action=data.get("action")
+    )
+    return jsonify({"status":"ok"})
 
 @app.route("/health")
 def health():
     return "OK", 200
-
-# ---------------------- HELPERS ----------------------
-
-def is_blocked_host(url):
-    u = url.lower()
-    for frag in BLOCK_HOST_FRAGMENTS:
-        if frag in u:
-            return True
-    return False
-
-def absolute_url(base, link):
-    try:
-        return urljoin(base, link)
-    except:
-        return link
-
-def rewrite_attr(base, attr_value):
-    if not attr_value:
-        return attr_value
-    a = attr_value.strip()
-    if a.startswith("javascript:") or a.startswith("data:") or a.startswith("#"):
-        return a
-    full = absolute_url(base, a)
-    if is_blocked_host(full):
-        logging.info(f"Blocked resource (rewrite stage): {full}")
-        return ""
-    return "/proxy?url=" + quote(full, safe='')
-
-def fetch_and_clean(url):
-    headers = {"User-Agent": "Mozilla/5.0"}
-    r = requests.get(url, headers=headers, timeout=20)
-    r.raise_for_status()
-    content_type = r.headers.get("Content-Type","").lower()
-    if "text/html" not in content_type:
-        logging.info(f"Non-HTML resource requested: {url}")
-        return f'<a href="{url}">Open resource (non-HTML)</a>'
-
-    soup = BeautifulSoup(r.text, "html.parser")
-
-    # Remove ad elements
-    for tag in soup.find_all(["script", "iframe", "ins", "noscript", "object", "embed"]):
-        tag.decompose()
-
-    ad_keywords = ["ad-", "ads-", "advert", "sponsor", "banner", "cookie-consent", "consent"]
-    removed = 0
-    for el in soup.find_all(True):
-        idv = (el.get("id") or "").lower()
-        clsv = " ".join(el.get("class") or []).lower()
-        if any(k in idv for k in ad_keywords) or any(k in clsv for k in ad_keywords):
-            el.decompose()
-            removed += 1
-    logging.info(f"Removed {removed} ad-tagged elements from {url}")
-
-    # Rewrite URLs
-    for tag in soup.find_all(True):
-        if tag.name == "a" and tag.has_attr("href"):
-            href = tag["href"]
-            if href.startswith("mailto:") or href.startswith("tel:"):
-                continue
-            tag["href"] = "/proxytool?site=" + quote(absolute_url(url, href), safe='')
-        if tag.has_attr("src"):
-            tag["src"] = rewrite_attr(url, tag["src"])
-        if tag.has_attr("data-src"):
-            tag["data-src"] = rewrite_attr(url, tag["data-src"])
-        if tag.has_attr("srcset"):
-            try:
-                srcset = tag["srcset"].split(",")[0].split(" ")[0]
-                tag["srcset"] = rewrite_attr(url, srcset)
-            except:
-                tag["srcset"] = ""
-
-    for el in soup.find_all(True):
-        for attr in list(el.attrs):
-            if attr.startswith("on"):
-                del el.attrs[attr]
-
-    return str(soup)
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
