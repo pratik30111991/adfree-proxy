@@ -1,0 +1,37 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Ad-Free Proxy Tool</title>
+<style>
+body{font-family:Arial,Helvetica,sans-serif;margin:20px;}
+input[type=text]{width:70%;padding:8px;}
+button{padding:6px 12px;margin:4px;}
+#frame{margin-top:20px;width:100%;height:600px;border:1px solid #ccc;}
+</style>
+</head>
+<body>
+<h2>Ad-Free Proxy Tool</h2>
+
+<form onsubmit="loadSite(); return false;">
+  <label>Enter website URL:</label><br>
+  <input type="text" id="siteurl" placeholder="https://example.com" required>
+  <button type="submit">Load</button>
+  <button type="button" onclick="document.getElementById('siteurl').value=''">Clear</button>
+</form>
+
+<iframe id="frame"></iframe>
+<div id="log" style="margin-top:10px;color:#555;"></div>
+
+<script>
+function loadSite(){
+  let url = document.getElementById('siteurl').value.trim();
+  if(!url) return;
+
+  // Proxy route on Flask backend
+  document.getElementById('frame').src = `/proxytool?site=${encodeURIComponent(url)}`;
+  document.getElementById('log').innerText = `Loaded: ${url}`;
+}
+</script>
+</body>
+</html>
