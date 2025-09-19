@@ -1,0 +1,45 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>YouTube Ad-Free Player</title>
+  <style>
+    body{font-family:Arial,Helvetica,sans-serif;margin:28px}
+    input[type=text]{width:70%;padding:8px}
+    button{padding:8px 12px;margin-left:6px}
+    .frame{margin-top:18px}
+  </style>
+</head>
+<body>
+  <h2>YouTube Ad-Free Player</h2>
+  <form onsubmit="loadVideo(); return false;">
+    <label>Enter YouTube URL:</label><br>
+    <input type="text" id="yturl" placeholder="https://www.youtube.com/watch?v=..." required>
+    <button type="submit">Play</button>
+    <button type="button" onclick="document.getElementById('yturl').value=''">Clear</button>
+  </form>
+
+  <div class="frame" id="player"></div>
+
+  <script>
+    function loadVideo() {
+      let url = document.getElementById('yturl').value.trim();
+      if (!url) return;
+      let videoId = "";
+      if (url.includes("v=")) {
+        videoId = new URL(url).searchParams.get("v");
+      } else if (url.includes("youtu.be/")) {
+        videoId = url.split("youtu.be/")[1];
+      }
+      if (videoId) {
+        document.getElementById('player').innerHTML =
+          `<iframe width="560" height="315" 
+            src="https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&modestbranding=1&rel=0" 
+            frameborder="0" allow="autoplay; encrypted-media" allowfullscreen></iframe>`;
+      } else {
+        document.getElementById('player').innerHTML = "<p style='color:red'>Invalid YouTube URL</p>";
+      }
+    }
+  </script>
+</body>
+</html>
