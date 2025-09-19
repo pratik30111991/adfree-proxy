@@ -10,27 +10,33 @@ button{padding:6px 12px;margin:4px;}
 #player{margin-top:20px;}
 .controls{margin-top:10px;}
 #qualitySelect{margin-left:8px;}
+#note{color:#777;margin-top:8px;}
 </style>
 </head>
 <body>
-<h2>YouTube Ad-Free Player (No Ads)</h2>
+<h2>YouTube Ad-Free Player (Quick client-side embed)</h2>
 
-<form onsubmit="loadVideo(); return false;">
+<form id="loadForm">
   <label>Enter YouTube URL or Playlist URL:</label><br>
-  <input type="text" id="yturl" placeholder="https://youtu.be/abc123" required>
+  <input type="text" id="yturl" placeholder="https://youtu.be/abc123 or https://www.youtube.com/watch?v=..." required>
   <button type="submit">Load</button>
-  <button type="button" onclick="document.getElementById('yturl').value=''">Clear</button>
+  <button type="button" id="clearBtn">Clear</button>
 </form>
 
+<div style="margin-top:6px;">
+  <input type="checkbox" id="useServer"> <label for="useServer">Use server for formats (slow, may require cookies)</label>
+</div>
+
 <div class="controls">
-  <button onclick="prevVideo()">⏮ Prev</button>
-  <button onclick="nextVideo()">⏭ Next</button>
+  <button onclick="prevVideo()" type="button">⏮ Prev</button>
+  <button onclick="nextVideo()" type="button">⏭ Next</button>
   <label>Quality:</label>
   <select id="qualitySelect" onchange="changeQuality()"></select>
 </div>
 
 <div id="player"></div>
 <div id="info" style="margin-top:10px;color:#555;"></div>
+<div id="note">Quick mode: iframe is embedded client-side. If a video is age-restricted or blocked, server mode might help (cookies or proxy required).</div>
 
 <script>
 let videoList = [];
@@ -38,93 +44,169 @@ let currentIndex = 0;
 let currentFormats = [];
 let currentVideoId = "";
 
-async function loadVideo() {
-  let url = document.getElementById('yturl').value.trim();
-  if(!url) return;
-
-  const res = await fetch("/get_video", {
-    method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body: JSON.stringify({url})
-  });
-  const data = await res.json();
-  if(data.error){ alert(data.error); return; }
-
-  if(data.next_videos && data.next_videos.length>0){
-    videoList = data.next_videos.map(v=>v.url)
-  } else {
-    videoList = [url];
+// Utility: extract first video id from several YouTube URL formats
+function extractVideoId(url){
+  if(!url) return null;
+  url = url.trim();
+  // If user pasted just the id
+  if(/^[a-zA-Z0-9_-]{11}$/.test(url)) return url;
+  try{
+    // youtu.be short
+    let m = url.match(/(?:youtu\.be\/)([A-Za-z0-9_-]{11})/);
+    if(m && m[1]) return m[1];
+    // v= param
+    m = url.match(/[?&]v=([A-Za-z0-9_-]{11})/);
+    if(m && m[1]) return m[1];
+    // embed/...
+    m = url.match(/\/embed\/([A-Za-z0-9_-]{11})/);
+    if(m && m[1]) return m[1];
+    // fallback: last path segment maybe id
+    let u = new URL(url);
+    let seg = u.pathname.split("/").filter(Boolean).pop();
+    if(seg && /^[A-Za-z0-9_-]{11}$/.test(seg)) return seg;
+  }catch(e){
+    // ignore
   }
-  currentIndex = 0;
-  playCurrentVideo(data);
+  return null;
 }
 
-async function playCurrentVideo(data=null){
-  let url = videoList[currentIndex];
-  if(!data){
+document.getElementById('clearBtn').addEventListener('click', ()=>{
+  document.getElementById('yturl').value = '';
+});
+
+document.getElementById('loadForm').addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  const raw = document.getElementById('yturl').value.trim();
+  if(!raw) return;
+  const useServer = document.getElementById('useServer').checked;
+
+  // If it's a playlist or contains multiple links, try to parse simple comma-separated urls
+  let urls = raw.split(/\s*,\s*|\s+/).filter(Boolean);
+  // map to either ids or original urls
+  let ids = urls.map(u => extractVideoId(u) || u);
+
+  videoList = ids;
+  currentIndex = 0;
+
+  if(useServer){
+    // call server for the first item and load formats if available
+    await playCurrentVideoServerSide();
+  } else {
+    playCurrentClientSide();
+  }
+});
+
+function playCurrentClientSide(){
+  let idOrUrl = videoList[currentIndex];
+  let vid = extractVideoId(idOrUrl) || idOrUrl; // if no id, may be full url but try fallback
+  currentVideoId = vid;
+  currentFormats = [];
+  // Clear quality select (client mode no formats)
+  const sel = document.getElementById('qualitySelect');
+  sel.innerHTML = '';
+  sel.disabled = true;
+
+  loadIframe(vid, null);
+  document.getElementById('info').innerText = "Playing (client embed) video ID: " + vid;
+  // Log play to server (non-blocking) so you keep logs
+  logPlaySimple(vid, "client");
+}
+
+async function playCurrentVideoServerSide(){
+  let urlOrId = videoList[currentIndex];
+  try{
     const res = await fetch("/get_video", {
       method:"POST",
       headers:{"Content-Type":"application/json"},
-      body: JSON.stringify({url})
+      body: JSON.stringify({url: urlOrId})
     });
-    data = await res.json();
-    if(data.error){ alert(data.error); return; }
+    const data = await res.json();
+    if(data.error){
+      alert("Server error: " + data.error + "\nFalling back to client embed.");
+      playCurrentClientSide();
+      return;
+    }
+    currentVideoId = data.id;
+    currentFormats = data.formats || [];
+    const qualitySelect = document.getElementById('qualitySelect');
+    qualitySelect.innerHTML = "";
+    if(currentFormats.length>0){
+      currentFormats.forEach(f=>{
+        let opt = document.createElement("option");
+        opt.value = f.format_id;
+        opt.text = (f.resolution || "auto") + " (" + (f.filesize ?? "?.") + "MB)";
+        qualitySelect.appendChild(opt);
+      });
+      qualitySelect.disabled = false;
+      // choose first
+      let fmt = currentFormats[0];
+      loadIframe(currentVideoId, fmt.format_id);
+      logPlay(data.title || currentVideoId, fmt);
+      document.getElementById('info').innerText = "Playing (server) video ID: " + currentVideoId;
+    } else {
+      // If server returned no formats, fallback to client embed
+      playCurrentClientSide();
+    }
+  }catch(err){
+    console.warn("Server call failed, falling back to client embed:", err);
+    playCurrentClientSide();
   }
-
-  currentVideoId = data.id;
-  currentFormats = data.formats || [];
-  const qualitySelect = document.getElementById('qualitySelect');
-  qualitySelect.innerHTML = "";
-  currentFormats.forEach(f=>{
-    let opt = document.createElement("option");
-    opt.value = f.format_id;
-    opt.text = f.resolution+" ("+f.filesize+"MB)";
-    qualitySelect.appendChild(opt);
-  });
-
-  let fmt = currentFormats[0];
-  loadIframe(currentVideoId, fmt.format_id);
-
-  logPlay(data.title, fmt);
 }
 
 function loadIframe(videoId, format_id){
+  // Use youtube-nocookie embed. Autoplay=1 tries to start; browser may block autoplay with sound.
   document.getElementById('player').innerHTML =
-    `<iframe width="560" height="315" src="https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&modestbranding=1&rel=0" frameborder="0" allow="autoplay; encrypted-media" allowfullscreen></iframe>`;
-  document.getElementById('info').innerText = "Playing video ID: "+videoId+" | format: "+format_id;
+    `<iframe id="ytplayer" width="900" height="506" src="https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&modestbranding=1&rel=0" frameborder="0" allow="autoplay; encrypted-media" allowfullscreen></iframe>`;
 }
 
 function nextVideo(){
   if(videoList.length==0) return;
   currentIndex = (currentIndex+1)%videoList.length;
-  playCurrentVideo();
+  const useServer = document.getElementById('useServer').checked;
+  if(useServer) playCurrentVideoServerSide(); else playCurrentClientSide();
 }
 
 function prevVideo(){
   if(videoList.length==0) return;
   currentIndex = (currentIndex-1+videoList.length)%videoList.length;
-  playCurrentVideo();
+  const useServer = document.getElementById('useServer').checked;
+  if(useServer) playCurrentVideoServerSide(); else playCurrentClientSide();
 }
 
 function changeQuality(){
+  // Only relevant in server mode and when formats exist; for client embed we can't change
   let select = document.getElementById('qualitySelect');
+  if(!select || select.disabled) return;
   let selectedId = select.value;
-  let fmt = currentFormats.find(f=>f.format_id==selectedId);
-  if(fmt) loadIframe(currentVideoId, fmt.format_id);
+  // If using server mode, re-load via server selection (we just re-use iframe with id; server could provide direct playable urls)
+  // For now, just reload the embed (format selection for direct streaming would require server delivering a URL).
+  loadIframe(currentVideoId, selectedId);
+}
+
+function logPlaySimple(videoId, mode){
+  try{
+    fetch("/log_play", {
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({ video_id: videoId, title: null, quality: mode, size_mb: null, action: "PLAY_CLIENT" })
+    });
+  }catch(e){ /* ignore */ }
 }
 
 function logPlay(title, fmt){
-  fetch("/log_play", {
-    method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body: JSON.stringify({
-      video_id: currentVideoId,
-      title: title,
-      quality: fmt.resolution,
-      size_mb: fmt.filesize,
-      action: "PLAY"
-    })
-  });
+  try{
+    fetch("/log_play", {
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({
+        video_id: currentVideoId,
+        title: title,
+        quality: fmt ? fmt.resolution : null,
+        size_mb: fmt ? fmt.filesize : null,
+        action: "PLAY_SERVER"
+      })
+    });
+  }catch(e){ /* ignore */ }
 }
 </script>
 </body>
