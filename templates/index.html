@@ -5,8 +5,9 @@
 <title>YouTube Player Proxy</title>
 <style>
   body { font-family: Arial; text-align: center; padding: 20px; }
-  iframe { width: 100%; max-width: 720px; height: 405px; margin-top: 20px; }
+  video, iframe { width: 100%; max-width: 720px; margin-top: 20px; }
   button { margin: 5px; padding: 10px 20px; }
+  select { margin: 5px; padding: 5px; }
 </style>
 </head>
 <body>
@@ -17,19 +18,22 @@
 
 <div id="playerContainer" style="display:none;">
     <h2 id="title"></h2>
-    <div id="videoWrapper"></div>
+    <video id="videoPlayer" controls></video><br>
     <button onclick="prevVideo()">Previous</button>
-    <button onclick="nextVideo()">Next</button>
+    <button onclick="nextVideo()">Next</button><br>
+    Quality: 
+    <select id="qualitySelect" onchange="changeQuality()"></select>
 </div>
 
 <script>
 let playlist = [];
 let currentIndex = 0;
+let currentFormats = [];
 
 async function loadVideo() {
     const url = document.getElementById("yturl").value;
     if (!url) return alert("Please paste a YouTube URL");
-
+    
     const res = await fetch("/get_video", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -40,6 +44,7 @@ async function loadVideo() {
 
     playlist = [data.current].concat(data.next_videos);
     currentIndex = 0;
+    currentFormats = playlist[0].formats || [];
     showVideo(currentIndex);
 }
 
@@ -49,9 +54,19 @@ function showVideo(index) {
     document.getElementById("playerContainer").style.display = "block";
     document.getElementById("title").innerText = v.title;
 
-    const wrapper = document.getElementById("videoWrapper");
-    wrapper.innerHTML = `<iframe src="https://www.youtube.com/embed/${v.id}?autoplay=1" 
-        frameborder="0" allow="autoplay; encrypted-media" allowfullscreen></iframe>`;
+    const videoEl = document.getElementById("videoPlayer");
+
+    if (v.formats && v.formats.length > 0) {
+        currentFormats = v.formats;
+        videoEl.src = `https://www.youtube.com/watch?v=${v.id}`;
+        populateQualitySelect(currentFormats);
+    } else {
+        videoEl.src = `https://www.youtube.com/watch?v=${v.id}`;
+        document.getElementById("qualitySelect").innerHTML = "";
+    }
+
+    videoEl.play().catch(e => console.log(e));
+    console.log(`Playing: ${v.title}`);
 }
 
 function nextVideo() {
@@ -65,6 +80,28 @@ function prevVideo() {
     if (currentIndex - 1 >= 0) {
         currentIndex--;
         showVideo(currentIndex);
+    }
+}
+
+function populateQualitySelect(formats) {
+    const select = document.getElementById("qualitySelect");
+    select.innerHTML = "";
+    formats.forEach(f => {
+        const opt = document.createElement("option");
+        opt.value = f.format_id;
+        opt.innerText = `${f.resolution} (${f.ext})`;
+        select.appendChild(opt);
+    });
+}
+
+function changeQuality() {
+    const selected = document.getElementById("qualitySelect").value;
+    const fmt = currentFormats.find(f => f.format_id === selected);
+    const videoEl = document.getElementById("videoPlayer");
+    if (fmt) {
+        videoEl.src = `https://www.youtube.com/watch?v=${playlist[currentIndex].id}`;
+        videoEl.play();
+        console.log(`Quality changed to: ${fmt.resolution} (${fmt.ext})`);
     }
 }
 </script>
