@@ -1,60 +1,62 @@
-import logging
 import os
+import logging
 from flask import Flask, render_template, request, jsonify
-import yt_dlp
+import requests
 
 logging.basicConfig(level=logging.INFO)
-
 app = Flask(__name__)
 
+# Use a public Piped server (Invidious alternative)
+PIPED_SERVER = "https://piped.kavin.rocks"
+
 def fetch_video_info(url):
-    """Fetch video info + playlist using yt-dlp"""
-    ydl_opts = {
-        "quiet": True,
-        "skip_download": True,
-        "forcejson": True,
-        "format": "bestvideo+bestaudio/best",
-    }
+    """Fetch video info from Piped API"""
+    try:
+        # extract video id from URL
+        if "youtube.com/watch?v=" in url:
+            vid_id = url.split("v=")[-1].split("&")[0]
+        elif "youtu.be/" in url:
+            vid_id = url.split("/")[-1]
+        else:
+            return {"error": "Invalid YouTube URL"}
 
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        info = ydl.extract_info(url, download=False)
+        api_url = f"{PIPED_SERVER}/api/v1/videos/{vid_id}"
+        resp = requests.get(api_url, timeout=10)
+        data = resp.json()
 
-    # Current video
-    current = {
-        "id": info.get("id"),
-        "title": info.get("title"),
-        "formats": [
-            {
-                "format_id": f.get("format_id"),
-                "ext": f.get("ext"),
-                "resolution": f.get("format_note") or f.get("resolution") or f.get("height") or "unknown",
-                "filesize": round(f.get("filesize", 0)/1024/1024, 2)
-            } for f in info.get("formats", [])
-        ]
-    }
+        # Prepare formats
+        formats = []
+        for f in data.get("videoStreams", []):
+            if f.get("url"):
+                formats.append({
+                    "format_id": f.get("qualityLabel", f.get("itag")),
+                    "url": f.get("url"),
+                    "resolution": f.get("qualityLabel"),
+                    "ext": f.get("mimeType", "mp4").split("/")[1]
+                })
 
-    # Full playlist / related videos if exists
-    next_videos = []
-    entries = info.get("entries") or []
-    for e in entries:
-        if not e: 
-            continue
-        next_videos.append({
-            "id": e.get("id"),
-            "title": e.get("title"),
-            "formats": [
-                {
-                    "format_id": f.get("format_id"),
-                    "ext": f.get("ext"),
-                    "resolution": f.get("format_note") or f.get("resolution") or f.get("height") or "unknown",
-                    "filesize": round(f.get("filesize", 0)/1024/1024, 2)
-                } for f in e.get("formats", [])
-            ]
-        })
+        # Playlist / related videos (first 5)
+        related = []
+        for r in data.get("relatedVideos", [])[:5]:
+            related.append({
+                "id": r.get("videoId"),
+                "title": r.get("title"),
+                "url": f"https://www.youtube.com/watch?v={r.get('videoId')}"
+            })
 
-    logging.info(f"Fetched video: {current['title']}, playlist count: {len(next_videos)}")
-    return {"current": current, "next_videos": next_videos}
+        current = {
+            "id": vid_id,
+            "title": data.get("title"),
+            "formats": formats
+        }
 
+        return {"current": current, "next_videos": related}
+
+    except Exception as e:
+        logging.error(f"Error fetching video: {e}")
+        return {"error": str(e)}
+
+# Routes
 @app.route("/")
 def index():
     return render_template("index.html")
@@ -65,12 +67,12 @@ def get_video():
     url = data.get("url")
     if not url:
         return jsonify({"error": "No URL provided"}), 400
-    try:
-        info = fetch_video_info(url)
-        return jsonify(info)
-    except Exception as e:
-        logging.error(f"Error fetching video: {e}")
-        return jsonify({"error": str(e)}), 500
+    info = fetch_video_info(url)
+    if "error" in info:
+        return jsonify({"error": info["error"]}), 500
+    # log video access
+    logging.info(f"Fetched video: {info['current']['title']} ({info['current']['id']})")
+    return jsonify(info)
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
