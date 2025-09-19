@@ -8,37 +8,71 @@
     input[type=text]{width:70%;padding:8px}
     button{padding:8px 12px;margin-left:6px}
     .frame{margin-top:18px}
+    .controls{margin-top:10px}
   </style>
 </head>
 <body>
-  <h2>YouTube Ad-Free Player</h2>
-  <form onsubmit="loadVideo(); return false;">
-    <label>Enter YouTube URL:</label><br>
-    <input type="text" id="yturl" placeholder="https://www.youtube.com/watch?v=..." required>
-    <button type="submit">Play</button>
-    <button type="button" onclick="document.getElementById('yturl').value=''">Clear</button>
+  <h2>YouTube Ad-Free Player (No Ads)</h2>
+  <form onsubmit="loadVideos(); return false;">
+    <label>Enter YouTube URLs (comma separated):</label><br>
+    <input type="text" id="yturls" 
+           placeholder="https://youtu.be/abc123, https://www.youtube.com/watch?v=xyz456" required>
+    <button type="submit">Load</button>
+    <button type="button" onclick="document.getElementById('yturls').value=''">Clear</button>
   </form>
 
   <div class="frame" id="player"></div>
+  <div class="controls">
+    <button onclick="prevVideo()">⏮ Prev</button>
+    <button onclick="nextVideo()">⏭ Next</button>
+  </div>
 
   <script>
-    function loadVideo() {
-      let url = document.getElementById('yturl').value.trim();
-      if (!url) return;
-      let videoId = "";
-      if (url.includes("v=")) {
-        videoId = new URL(url).searchParams.get("v");
-      } else if (url.includes("youtu.be/")) {
-        videoId = url.split("youtu.be/")[1];
-      }
-      if (videoId) {
-        document.getElementById('player').innerHTML =
-          `<iframe width="560" height="315" 
-            src="https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&modestbranding=1&rel=0" 
-            frameborder="0" allow="autoplay; encrypted-media" allowfullscreen></iframe>`;
+    let videoList = [];
+    let currentIndex = 0;
+
+    function extractId(url) {
+      try {
+        if (url.includes("v=")) {
+          return new URL(url).searchParams.get("v");
+        } else if (url.includes("youtu.be/")) {
+          return url.split("youtu.be/")[1].split("?")[0];
+        }
+      } catch {}
+      return "";
+    }
+
+    function loadVideos() {
+      let input = document.getElementById('yturls').value.trim();
+      if (!input) return;
+
+      videoList = input.split(",").map(u => extractId(u.trim())).filter(v => v);
+      currentIndex = 0;
+
+      if (videoList.length > 0) {
+        playVideo(videoList[currentIndex]);
       } else {
-        document.getElementById('player').innerHTML = "<p style='color:red'>Invalid YouTube URL</p>";
+        document.getElementById('player').innerHTML = "<p style='color:red'>No valid YouTube URLs</p>";
       }
+    }
+
+    function playVideo(videoId) {
+      document.getElementById('player').innerHTML =
+        `<iframe width="560" height="315"
+          src="https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&modestbranding=1&rel=0"
+          frameborder="0" allow="autoplay; encrypted-media" allowfullscreen></iframe>`;
+    }
+
+    function nextVideo() {
+      if (videoList.length === 0) return;
+      currentIndex = (currentIndex + 1) % videoList.length;
+      playVideo(videoList[currentIndex]);
+    }
+
+    function prevVideo() {
+      if (videoList.length === 0) return;
+      currentIndex = (currentIndex - 1 + videoList.length) % videoList.length;
+      playVideo(videoList[currentIndex]);
     }
   </script>
 </body>
