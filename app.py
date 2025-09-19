@@ -4,23 +4,19 @@ from flask import Flask, render_template, request, jsonify
 import yt_dlp
 
 logging.basicConfig(level=logging.INFO)
-
 app = Flask(__name__)
 
 def fetch_video_info(url):
-    """Fetch video info + next videos using yt-dlp"""
     ydl_opts = {
         "quiet": True,
         "skip_download": True,
-        "extract_flat": True,  # flat extract to avoid downloading all playlist
+        "extract_flat": True,
         "forcejson": True,
         "format": "bestvideo+bestaudio/best"
     }
-
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(url, download=False)
     
-    # Current video
     current = {
         "id": info.get("id"),
         "title": info.get("title"),
@@ -34,10 +30,9 @@ def fetch_video_info(url):
         ]
     }
 
-    # Next videos: yt-dlp gives entries if playlist / related
     next_videos = []
     entries = info.get("entries") or []
-    for e in entries[:5]:  # first 5 next videos
+    for e in entries[:5]:
         next_videos.append({
             "id": e.get("id"),
             "title": e.get("title")
@@ -45,8 +40,6 @@ def fetch_video_info(url):
 
     return {"current": current, "next_videos": next_videos}
 
-
-# Routes
 @app.route("/")
 def index():
     return render_template("index.html")
@@ -63,7 +56,6 @@ def get_video():
     except Exception as e:
         logging.error(f"Error fetching video: {e}")
         return jsonify({"error": str(e)}), 500
-
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
