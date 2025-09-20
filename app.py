@@ -6,14 +6,12 @@ import requests
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 app = Flask(__name__)
 
-# Primary fallback list of public Piped instances (we try these if PIPED_SERVER not set)
 DEFAULT_PIPED_INSTANCES = [
     "https://piped.video",
     "https://piped.kavin.rocks",
-    "https://piped.video.kavin.rocks"  # optional / extra
+    "https://piped.video.kavin.rocks"
 ]
 
-# Pick PIPED server from env or fallback list
 PIPED_SERVER = os.environ.get("PIPED_SERVER")
 
 def get_piped_endpoints():
@@ -22,16 +20,19 @@ def get_piped_endpoints():
     return [u.rstrip("/") for u in DEFAULT_PIPED_INSTANCES]
 
 def try_fetch_from_piped(vid_id):
-    """Try each piped instance in order and return parsed JSON data or raise."""
     last_err = None
     for base in get_piped_endpoints():
         api_url = f"{base}/api/v1/videos/{vid_id}"
         logging.info(f"Trying Piped API: {api_url}")
         try:
             resp = requests.get(api_url, timeout=10, headers={"User-Agent":"Mozilla/5.0"})
-            # If server returns non-JSON (HTML error page), .json() raises ValueError
-            data = resp.json()
-            # Basic sanity check:
+            if resp.status_code != 200:
+                raise ValueError(f"HTTP {resp.status_code}")
+            try:
+                data = resp.json()
+            except Exception as je:
+                logging.error(f"JSON parse error from {base}: {je}, text={resp.text[:200]}")
+                raise je
             if not isinstance(data, dict) or "title" not in data:
                 raise ValueError("Unexpected JSON structure")
             logging.info(f"Piped instance succeeded: {base}")
@@ -50,7 +51,6 @@ def extract_video_id(url):
         return u.split("youtu.be/")[-1].split("?")[0].split("&")[0]
     if "v=" in u and "youtube" in u:
         return u.split("v=")[-1].split("&")[0]
-    # fallback: last path segment
     if "/" in u:
         return u.rstrip("/").split("/")[-1]
     return u
@@ -72,14 +72,12 @@ def get_video():
     try:
         piped_json = try_fetch_from_piped(vid_id)
     except Exception as e:
-        logging.error(f"Error fetching from any piped instance: {e}")
-        return jsonify({"error":"Failed to fetch video info from Piped instances. Try later or self-host a Piped instance."}), 500
+        logging.error(f"Error fetching from Piped: {e}")
+        return jsonify({"error":f"Failed to fetch video info. Details: {str(e)}"}), 500
 
-    # Build formats list from Piped response (videoStreams)
     formats = []
     for f in piped_json.get("videoStreams", []):
-        # skip items without url
-        if not f.get("url"): 
+        if not f.get("url"):
             continue
         formats.append({
             "format_id": f.get("qualityLabel") or f.get("itag"),
@@ -88,17 +86,15 @@ def get_video():
             "ext": (f.get("mimeType") or "video/mp4").split("/")[1] if f.get("mimeType") else "mp4"
         })
 
-    # Related videos (take first 20 to be safe)
     related = []
     for r in piped_json.get("relatedVideos", [])[:20]:
         rid = r.get("videoId")
-        if not rid: 
+        if not rid:
             continue
         related.append({
             "id": rid,
             "title": r.get("title") or "",
             "url": f"https://www.youtube.com/watch?v={rid}",
-            # formats for related will be empty here — we only have id/title from related
             "formats": []
         })
 
@@ -118,5 +114,4 @@ def log_play():
     return jsonify({"status":"ok"})
 
 if __name__ == "__main__":
-    # port provided by Render or default 5000
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
