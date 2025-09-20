@@ -1,157 +1,75 @@
-<!doctype html>
-<html>
+<!DOCTYPE html>
+<html lang="en">
 <head>
-  <meta charset="utf-8">
-  <title>Ad-Free Player (Piped-back)</title>
-  <style>
-    body{font-family:Arial;margin:18px;text-align:center;}
-    input[type=text]{width:72%;padding:8px}
-    button{padding:8px 12px;margin:6px}
-    video{width:100%;max-width:920px;margin-top:12px}
-    #controls{margin-top:10px}
-    #status{color:#666;margin-top:8px}
-    #servedBy{font-size:12px;color:#888;margin-top:6px}
-  </style>
+    <meta charset="UTF-8">
+    <title>Ad-Free YouTube Player</title>
+    <style>
+        body { font-family: Arial; background: #111; color: #fff; text-align: center; }
+        video { width: 80%; margin-top: 20px; }
+        input { width: 60%; padding: 10px; margin-top: 20px; }
+        button { padding: 10px 20px; margin-left: 10px; cursor: pointer; }
+        .controls { margin-top: 10px; }
+    </style>
 </head>
 <body>
-  <h2>Ad-Free Player (Piped-backed)</h2>
-  <p>Paste a YouTube URL and press Load. For best reliability, self-host a Piped instance and set env <code>PIPED_SERVER</code>.</p>
+    <h1>Ad-Free YouTube Player</h1>
+    <input type="text" id="videoUrl" placeholder="Enter YouTube link">
+    <button onclick="loadVideo()">Play</button>
 
-  <input id="yturl" placeholder="https://www.youtube.com/watch?v=..." />
-  <button onclick="loadVideo()">Load</button>
-
-  <div id="status"></div>
-
-  <div id="playerContainer" style="display:none">
-    <h3 id="title"></h3>
-    <div id="mediaWrapper">
-      <video id="player" controls crossorigin="anonymous"></video>
+    <div class="controls">
+        <button onclick="prevVideo()">Prev</button>
+        <button onclick="nextVideo()">Next</button>
     </div>
 
-    <div id="controls">
-      <button onclick="prevVideo()">◀ Previous</button>
-      <button onclick="nextVideo()">Next ▶</button>
-      <label>Quality:</label>
-      <select id="qualitySelect" onchange="changeQuality()"></select>
-    </div>
+    <video id="player" controls autoplay></video>
 
-    <div id="servedBy"></div>
-    <div style="margin-top:6px;color:#666">
-      <small>Server-side logs will show requests on the Render console.</small>
-    </div>
-  </div>
+    <script>
+        let playlist = [];
+        let currentIndex = 0;
 
-<script>
-let playlist = [];
-let currentIndex = 0;
-let currentFormats = [];
+        function loadVideo() {
+            const url = document.getElementById("videoUrl").value;
+            fetch("/get_video", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ url })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if(data.error) { alert(data.error); return; }
+                playlist.push(data);
+                currentIndex = playlist.length - 1;
+                playCurrent();
+            });
+        }
 
-function setStatus(msg, isError=false){
-  const s = document.getElementById('status');
-  s.innerText = msg;
-  s.style.color = isError ? 'crimson' : '#333';
-}
+        function playCurrent() {
+            const video = playlist[currentIndex];
+            const player = document.getElementById("player");
+            // Get best available mp4 format
+            const formats = video.streams.filter(f => f.mimeType.includes("video/mp4"));
+            if(formats.length === 0) { alert("No playable format found"); return; }
+            player.src = formats[0].url;
+            player.play();
+        }
 
-async function loadVideo(){
-  const url = document.getElementById('yturl').value.trim();
-  if(!url) { alert('Paste a YouTube URL first'); return; }
-  setStatus('Loading video info...');
-  try{
-    const res = await fetch('/get_video', {
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({url})
-    });
-    const data = await res.json();
-    if(data.error){
-      setStatus('Server: ' + data.error, true);
-      return;
-    }
-    playlist = [data.current].concat(data.next_videos || []);
-    currentIndex = 0;
-    currentFormats = playlist[0].formats || [];
-    document.getElementById('servedBy').innerText = 'Served by: ' + (data.current.served_by || 'unknown');
-    showVideo(currentIndex);
-    setStatus('Loaded — playing');
-  }catch(err){
-    console.error(err);
-    setStatus('Request failed: ' + err.message, true);
-  }
-}
+        function nextVideo() {
+            if(currentIndex + 1 < playlist.length) {
+                currentIndex++;
+                playCurrent();
+            } else {
+                alert("No more videos in playlist");
+            }
+        }
 
-function showVideo(idx){
-  const v = playlist[idx];
-  if(!v) return;
-  document.getElementById('playerContainer').style.display = 'block';
-  document.getElementById('title').innerText = (v.title || v.id);
-  const player = document.getElementById('player');
-
-  // If formats available, use first (best)
-  if(v.formats && v.formats.length){
-    currentFormats = v.formats;
-    player.src = currentFormats[0].url;
-    populateQuality(currentFormats);
-  } else {
-    // if no formats, fallback to youtube-nocookie iframe (replace video tag)
-    const iframe = document.createElement('iframe');
-    iframe.width = "920"; iframe.height = "518";
-    iframe.src = `https://www.youtube-nocookie.com/embed/${v.id}?autoplay=1`;
-    iframe.allow = "autoplay; encrypted-media";
-    const wrapper = document.getElementById('mediaWrapper');
-    wrapper.innerHTML = '';
-    wrapper.appendChild(iframe);
-  }
-
-  // try play if video element present
-  setTimeout(()=> {
-    player.play().catch(e=>console.log('play error', e));
-  }, 200);
-
-  // log to server (non-blocking)
-  try {
-    fetch('/log_play', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({video_id:v.id, title:v.title, action:'play'})});
-  } catch(e){}
-}
-
-function nextVideo(){
-  if(currentIndex + 1 < playlist.length){
-    currentIndex++;
-    showVideo(currentIndex);
-  } else {
-    alert('No more related videos loaded');
-  }
-}
-
-function prevVideo(){
-  if(currentIndex - 1 >= 0){
-    currentIndex--;
-    showVideo(currentIndex);
-  } else {
-    alert('Already at first video');
-  }
-}
-
-function populateQuality(formats){
-  const sel = document.getElementById('qualitySelect');
-  sel.innerHTML = '';
-  formats.forEach(f => {
-    const opt = document.createElement('option');
-    opt.value = f.url;
-    opt.innerText = `${f.resolution || f.format_id} (${f.ext || 'mp4'})`;
-    sel.appendChild(opt);
-  });
-}
-
-function changeQuality(){
-  const sel = document.getElementById('qualitySelect');
-  const url = sel.value;
-  const player = document.getElementById('player');
-  if(player && url){
-    player.src = url;
-    player.play().catch(()=>{});
-    fetch('/log_play', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({action:'quality', url})}).catch(()=>{});
-  }
-}
-</script>
+        function prevVideo() {
+            if(currentIndex - 1 >= 0) {
+                currentIndex--;
+                playCurrent();
+            } else {
+                alert("This is the first video");
+            }
+        }
+    </script>
 </body>
 </html>
