@@ -1,6 +1,5 @@
-import subprocess
-import json
 from flask import Flask, request, jsonify, render_template_string
+import yt_dlp
 
 app = Flask(__name__)
 
@@ -86,36 +85,49 @@ def get_video():
         return jsonify({"error": "No URL provided"}), 400
 
     try:
-        # yt-dlp command to fetch best stream + related videos
-        cmd = [
-            "yt-dlp",
-            "-j",               # JSON output
-            "--flat-playlist",  # only metadata
-            url
-        ]
-        result = subprocess.run(cmd, capture_output=True, text=True)
-        if result.returncode != 0:
-            return jsonify({"error": "yt-dlp failed", "details": result.stderr}), 500
+        ydl_opts = {
+            "quiet": True,
+            "no_warnings": True,
+            "extract_flat": False,
+            "format": "best[ext=mp4][height<=720]",
+        }
 
-        lines = result.stdout.strip().split("\n")
         playlist = []
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=False)
 
-        for line in lines[:5]:  # take max 5 items for Next/Prev
-            info = json.loads(line)
-            # get actual stream URL for each entry
-            stream_cmd = [
-                "yt-dlp",
-                "-f", "best[ext=mp4][height<=720]",
-                "-g",  # get direct URL
-                f"https://www.youtube.com/watch?v={info['id']}"
-            ]
-            stream = subprocess.run(stream_cmd, capture_output=True, text=True)
-            stream_url = stream.stdout.strip()
-            playlist.append({
-                "title": info.get("title", "Untitled"),
-                "id": info["id"],
-                "url": stream_url
-            })
+            # Agar ye ek playlist hai
+            if "entries" in info:
+                entries = info["entries"][:5]  # sirf first 5 load karo
+                for e in entries:
+                    if not e:
+                        continue
+                    formats = e.get("formats") or []
+                    stream_url = None
+                    for f in formats:
+                        if f.get("ext") == "mp4" and f.get("url"):
+                            stream_url = f["url"]
+                            break
+                    if stream_url:
+                        playlist.append({
+                            "title": e.get("title"),
+                            "id": e.get("id"),
+                            "url": stream_url
+                        })
+            else:
+                # Single video
+                formats = info.get("formats") or []
+                stream_url = None
+                for f in formats:
+                    if f.get("ext") == "mp4" and f.get("url"):
+                        stream_url = f["url"]
+                        break
+                if stream_url:
+                    playlist.append({
+                        "title": info.get("title"),
+                        "id": info.get("id"),
+                        "url": stream_url
+                    })
 
         return jsonify({"playlist": playlist})
 
