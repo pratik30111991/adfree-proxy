@@ -22,7 +22,7 @@ select { margin-left: 10px; }
 
 <div style="display:flex;">
 <div style="flex:1;">
-<audio id="player" controls autoplay></audio>
+<video id="player" controls autoplay></video>
 <div class="controls">
 <button onclick="prevSong()">Prev</button>
 <button onclick="nextSong()">Next</button>
@@ -45,7 +45,8 @@ Quality: <select id="quality" onchange="setQuality(this.value)"></select>
 <script>
 let playlist = [];
 let currentIndex = 0;
-let currentQuality = "64kb";
+let currentQuality = "";
+let currentType = "audio"; // audio or video
 
 function loadDefaultSongs() {
 fetch('/default_songs').then(res => res.json()).then(data => {
@@ -65,7 +66,8 @@ const sidebar = document.getElementById("sidebar");
 sidebar.innerHTML = "<h3>Suggestions</h3>";
 songs.forEach((s,i)=>{
 const div = document.createElement("div"); div.className="song-item";
-div.innerHTML=`<img src="${s.thumbnail}" onerror="this.src='https://via.placeholder.com/50'"/> <div>${s.title} (${s.year})<br>${s.artist}</div>`;
+div.innerHTML=`<img src="${s.thumbnail}" onerror="this.src='https://via.placeholder.com/50'"/> 
+<div>${s.title} (${s.year})<br>${s.artist}</div>`;
 div.onclick=()=>{currentIndex=i; playCurrent();};
 sidebar.appendChild(div);
 });
@@ -75,7 +77,10 @@ function playCurrent() {
 if(playlist.length===0) return;
 const song = playlist[currentIndex];
 const player = document.getElementById("player");
-player.src=song.audio_url; player.play();
+currentType = song.category=="audio"?"audio":"video";
+
+player.src = (currentType=="audio") ? song.audio_url : song.video_url;
+player.play();
 
 // populate quality
 const qualitySelect = document.getElementById("quality");
@@ -83,9 +88,10 @@ qualitySelect.innerHTML="";
 song.qualities.forEach(q=>{
 const option=document.createElement("option");
 option.value=q; option.textContent=q;
-if(q===currentQuality) option.selected=true;
 qualitySelect.appendChild(option);
 });
+currentQuality = song.qualities[0];
+qualitySelect.value=currentQuality;
 }
 
 function nextSong(){ if(currentIndex+1<playlist.length){currentIndex++; playCurrent();} }
