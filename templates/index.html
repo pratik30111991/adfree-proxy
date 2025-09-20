@@ -2,74 +2,112 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Ad-Free YouTube Player</title>
+    <title>Ad-Free Music & Video Player</title>
     <style>
         body { font-family: Arial; background: #111; color: #fff; text-align: center; }
-        video { width: 80%; margin-top: 20px; }
+        video, audio { width: 80%; margin-top: 20px; }
         input { width: 60%; padding: 10px; margin-top: 20px; }
         button { padding: 10px 20px; margin-left: 10px; cursor: pointer; }
         .controls { margin-top: 10px; }
+        .sidebar { float: right; width: 20%; text-align: left; background: #222; padding: 10px; max-height: 80vh; overflow-y: scroll;}
+        .song-item { margin: 5px 0; cursor: pointer; }
+        select { margin-left: 10px; }
     </style>
 </head>
 <body>
-    <h1>Ad-Free YouTube Player</h1>
-    <input type="text" id="videoUrl" placeholder="Enter YouTube link">
-    <button onclick="loadVideo()">Play</button>
+    <h1>Ad-Free Music & Video Player</h1>
+    <input type="text" id="searchQuery" placeholder="Search by title, artist, year">
+    <button onclick="searchSongs()">Search</button>
 
-    <div class="controls">
-        <button onclick="prevVideo()">Prev</button>
-        <button onclick="nextVideo()">Next</button>
+    <div style="display:flex;">
+        <div style="flex:1;">
+            <audio id="player" controls autoplay></audio>
+            <div class="controls">
+                <button onclick="prevSong()">Prev</button>
+                <button onclick="nextSong()">Next</button>
+                Volume: <input type="range" id="volume" min="0" max="1" step="0.01" onchange="setVolume(this.value)">
+                Speed: <select id="speed" onchange="setSpeed(this.value)">
+                    <option value="0.5">0.5x</option>
+                    <option value="1" selected>1x</option>
+                    <option value="1.5">1.5x</option>
+                    <option value="2">2x</option>
+                </select>
+                Quality: <select id="quality" onchange="setQuality(this.value)"></select>
+            </div>
+        </div>
+
+        <div class="sidebar" id="sidebar">
+            <h3>Suggestions</h3>
+        </div>
     </div>
-
-    <video id="player" controls autoplay></video>
 
     <script>
         let playlist = [];
         let currentIndex = 0;
+        let currentQuality = "360p";
 
-        function loadVideo() {
-            const url = document.getElementById("videoUrl").value;
-            fetch("/get_video", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ url })
-            })
-            .then(res => res.json())
-            .then(data => {
-                if(data.error) { alert(data.error); return; }
-                playlist.push(data);
-                currentIndex = playlist.length - 1;
-                playCurrent();
+        function loadPlayer() {
+            const player = document.getElementById("player");
+            player.volume = 0.5;
+            player.playbackRate = 1;
+        }
+
+        function searchSongs() {
+            const query = document.getElementById("searchQuery").value;
+            fetch(`/search?q=${encodeURIComponent(query)}`)
+                .then(res => res.json())
+                .then(data => {
+                    playlist = data;
+                    currentIndex = 0;
+                    showSidebar(data);
+                    playCurrent();
+                });
+        }
+
+        function showSidebar(songs) {
+            const sidebar = document.getElementById("sidebar");
+            sidebar.innerHTML = "<h3>Suggestions</h3>";
+            songs.forEach((s, i) => {
+                const div = document.createElement("div");
+                div.className = "song-item";
+                div.textContent = `${s.title} (${s.year})`;
+                div.onclick = () => { currentIndex = i; playCurrent(); };
+                sidebar.appendChild(div);
             });
         }
 
         function playCurrent() {
-            const video = playlist[currentIndex];
+            if(playlist.length === 0) return;
+            const song = playlist[currentIndex];
             const player = document.getElementById("player");
-            // Get best available mp4 format
-            const formats = video.streams.filter(f => f.mimeType.includes("video/mp4"));
-            if(formats.length === 0) { alert("No playable format found"); return; }
-            player.src = formats[0].url;
+
+            let url = song.audio_url;
+            if(song.qualities.includes(currentQuality)){
+                url = song.audio_url.replace(".mp3", `_${currentQuality}.mp3`);
+            }
+
+            player.src = url;
             player.play();
+
+            // populate quality select
+            const qualitySelect = document.getElementById("quality");
+            qualitySelect.innerHTML = "";
+            song.qualities.forEach(q => {
+                const option = document.createElement("option");
+                option.value = q;
+                option.textContent = q;
+                if(q === currentQuality) option.selected = true;
+                qualitySelect.appendChild(option);
+            });
         }
 
-        function nextVideo() {
-            if(currentIndex + 1 < playlist.length) {
-                currentIndex++;
-                playCurrent();
-            } else {
-                alert("No more videos in playlist");
-            }
-        }
+        function nextSong() { if(currentIndex+1 < playlist.length){ currentIndex++; playCurrent(); } }
+        function prevSong() { if(currentIndex-1 >=0){ currentIndex--; playCurrent(); } }
+        function setVolume(v){ document.getElementById("player").volume = v; }
+        function setSpeed(s){ document.getElementById("player").playbackRate = s; }
+        function setQuality(q){ currentQuality = q; playCurrent(); }
 
-        function prevVideo() {
-            if(currentIndex - 1 >= 0) {
-                currentIndex--;
-                playCurrent();
-            } else {
-                alert("This is the first video");
-            }
-        }
+        loadPlayer();
     </script>
 </body>
 </html>
