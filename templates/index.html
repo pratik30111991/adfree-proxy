@@ -1,105 +1,128 @@
-<!DOCTYPE html>
-<html lang="en">
+<!doctype html>
+<html>
 <head>
-<meta charset="UTF-8">
-<title>YouTube Ad-Free Player</title>
-<style>
-body { font-family: Arial; text-align: center; padding: 20px; }
-video { width: 100%; max-width: 720px; margin-top: 20px; }
-button { margin: 5px; padding: 10px 20px; }
-select { margin: 5px; padding: 5px; }
-</style>
+  <meta charset="utf-8">
+  <title>Ad-Free Player (Piped)</title>
+  <style>
+    body{font-family:Arial;margin:18px;text-align:center;}
+    input[type=text]{width:72%;padding:8px}
+    button{padding:8px 12px;margin:6px}
+    video{width:100%;max-width:920px;margin-top:12px}
+    #controls{margin-top:10px}
+  </style>
 </head>
 <body>
+  <h2>Ad-Free Player (Piped-backed)</h2>
+  <p>Paste a YouTube URL and press Load. For best reliability, self-host a Piped instance and set env PIPED_SERVER.</p>
 
-<h1>YouTube Ad-Free Player</h1>
-<input type="text" id="yturl" placeholder="Paste YouTube URL here" size="50">
-<button onclick="loadVideo()">Load</button>
+  <input id="yturl" placeholder="https://www.youtube.com/watch?v=..." />
+  <button onclick="loadVideo()">Load</button>
 
-<div id="playerContainer" style="display:none;">
-    <h2 id="title"></h2>
-    <video id="videoPlayer" controls></video><br>
-    <button onclick="prevVideo()">Previous</button>
-    <button onclick="nextVideo()">Next</button><br>
-    Quality: <select id="qualitySelect" onchange="changeQuality()"></select>
-</div>
+  <div id="playerContainer" style="display:none">
+    <h3 id="title"></h3>
+    <video id="player" controls crossorigin="anonymous"></video>
+    <div id="controls">
+      <button onclick="prevVideo()">◀ Previous</button>
+      <button onclick="nextVideo()">Next ▶</button>
+      <label>Quality:</label>
+      <select id="qualitySelect" onchange="changeQuality()"></select>
+    </div>
+    <div style="margin-top:6px;color:#666">
+      <small>Server-side logs will show requests on the Render console.</small>
+    </div>
+  </div>
 
 <script>
 let playlist = [];
 let currentIndex = 0;
 let currentFormats = [];
 
-async function loadVideo() {
-    const url = document.getElementById("yturl").value;
-    if (!url) return alert("Please paste a YouTube URL");
-    
-    const res = await fetch("/get_video", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url })
-    });
+async function loadVideo(){
+  const url = document.getElementById('yturl').value.trim();
+  if(!url) return alert('Paste a YouTube URL first');
+  try{
+    const res = await fetch('/get_video', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({url})});
     const data = await res.json();
-    if (data.error) return alert(data.error);
-
-    playlist = [data.current].concat(data.next_videos);
+    if(data.error) { alert('Server: ' + data.error); return; }
+    playlist = [data.current].concat(data.next_videos || []);
     currentIndex = 0;
-    currentFormats = data.current.formats || [];
+    currentFormats = playlist[0].formats || [];
     showVideo(currentIndex);
+  }catch(err){
+    console.error(err);
+    alert('Request failed: ' + err.message);
+  }
 }
 
-function showVideo(index) {
-    if (!playlist[index]) return;
-    const v = playlist[index];
-    document.getElementById("playerContainer").style.display = "block";
-    document.getElementById("title").innerText = v.title;
+function showVideo(idx){
+  const v = playlist[idx];
+  if(!v) return;
+  document.getElementById('playerContainer').style.display = 'block';
+  document.getElementById('title').innerText = (v.title || v.id);
+  const player = document.getElementById('player');
 
-    const videoEl = document.getElementById("videoPlayer");
+  // If formats available, pick the first (best)
+  if(v.formats && v.formats.length){
+    currentFormats = v.formats;
+    player.src = currentFormats[0].url;
+    populateQuality(currentFormats);
+  } else {
+    // fallback: use youtube-nocookie embed inside video tag is not possible
+    // Instead switch to iframe embed as last resort:
+    const iframe = document.createElement('iframe');
+    iframe.width = "920"; iframe.height = "518";
+    iframe.src = `https://www.youtube-nocookie.com/embed/${v.id}?autoplay=1`;
+    iframe.allow = "autoplay; encrypted-media";
+    // replace video element with iframe
+    const wrapper = player.parentNode;
+    wrapper.replaceChild(iframe, player);
+  }
 
-    if (currentFormats.length > 0) {
-        videoEl.src = currentFormats[0].url; // default best quality
-        populateQualitySelect(currentFormats);
-    } else {
-        videoEl.src = "";
-        document.getElementById("qualitySelect").innerHTML = "";
-    }
+  player.play().catch(e=>console.log('play error', e));
 
-    videoEl.play().catch(e => console.log(e));
+  // log to server (non-blocking)
+  try { fetch('/log_play', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({video_id:v.id, title:v.title, action:'play'})}); } catch(e){}
 }
 
-function nextVideo() {
-    if (currentIndex + 1 < playlist.length) {
-        currentIndex++;
-        currentFormats = playlist[currentIndex].formats || currentFormats;
-        showVideo(currentIndex);
-    }
+function nextVideo(){
+  if(currentIndex + 1 < playlist.length){
+    currentIndex++;
+    showVideo(currentIndex);
+  } else {
+    alert('No more related videos loaded');
+  }
 }
 
-function prevVideo() {
-    if (currentIndex - 1 >= 0) {
-        currentIndex--;
-        currentFormats = playlist[currentIndex].formats || currentFormats;
-        showVideo(currentIndex);
-    }
+function prevVideo(){
+  if(currentIndex - 1 >= 0){
+    currentIndex--;
+    showVideo(currentIndex);
+  } else {
+    alert('Already at first video');
+  }
 }
 
-function populateQualitySelect(formats) {
-    const select = document.getElementById("qualitySelect");
-    select.innerHTML = "";
-    formats.forEach(f => {
-        const opt = document.createElement("option");
-        opt.value = f.url;
-        opt.innerText = `${f.resolution} (${f.ext})`;
-        select.appendChild(opt);
-    });
+function populateQuality(formats){
+  const sel = document.getElementById('qualitySelect');
+  sel.innerHTML = '';
+  formats.forEach(f => {
+    const opt = document.createElement('option');
+    opt.value = f.url;
+    opt.innerText = `${f.resolution || f.format_id} (${f.ext || 'mp4'})`;
+    sel.appendChild(opt);
+  });
 }
 
-function changeQuality() {
-    const selected = document.getElementById("qualitySelect").value;
-    const videoEl = document.getElementById("videoPlayer");
-    videoEl.src = selected;
-    videoEl.play();
+function changeQuality(){
+  const sel = document.getElementById('qualitySelect');
+  const url = sel.value;
+  const player = document.getElementById('player');
+  if(player && url){
+    player.src = url;
+    player.play().catch(()=>{});
+    fetch('/log_play', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({action:'quality', url})}).catch(()=>{});
+  }
 }
 </script>
-
 </body>
 </html>
