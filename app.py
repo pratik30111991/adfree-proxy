@@ -52,5 +52,10 @@ def search():
 
     return jsonify(results)
 
+@app.route("/default_songs", methods=["GET"])
+def default_songs():
+    # Return first 5 songs (or fewer if library smaller) as default suggestions
+    return jsonify(MEDIA_LIBRARY[:5])
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000, debug=True)
