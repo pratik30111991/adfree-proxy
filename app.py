@@ -5,7 +5,7 @@ app = Flask(__name__)
 
 ARCHIVE_API = "https://archive.org/advancedsearch.php"
 
-def fetch_archive_songs(query="", rows=10):
+def fetch_archive_songs(query="", rows=15):
     query_str = f'title:("{query}")' if query else 'mediatype:(audio video)'
     params = {
         'q': query_str,
@@ -21,17 +21,24 @@ def fetch_archive_songs(query="", rows=10):
     docs = r.json().get('response', {}).get('docs', [])
     songs = []
     for d in docs:
-        audio_url = f"https://archive.org/download/{d.get('identifier')}/{d.get('identifier')}_64kb.mp3"
-        image = d.get('image', [""])[0] if "image" in d else ""
+        identifier = d.get('identifier')
+        mediatype = d.get('mediatype','audio')
+        if mediatype == "audio":
+            audio_url = f"https://archive.org/download/{identifier}/{identifier}_64kb.mp3"
+            video_url = ""
+        else:
+            video_url = f"https://archive.org/download/{identifier}/{identifier}.mp4"
+            audio_url = f"https://archive.org/download/{identifier}/{identifier}_64kb.mp3"
+        thumbnail = f"https://archive.org/services/img/{identifier}"
         songs.append({
             "title": d.get('title', 'Unknown'),
             "artist": d.get('creator', 'Unknown'),
             "year": d.get('date', 'Unknown'),
-            "category": d.get('mediatype', 'audio'),
+            "category": mediatype,
             "audio_url": audio_url,
-            "video_url": "",  # optional: can fetch mp4 if exists
-            "thumbnail": f"https://archive.org/services/img/{d.get('identifier')}" if image else "",
-            "qualities": ["64kb"]
+            "video_url": video_url,
+            "thumbnail": thumbnail,
+            "qualities": ["64kb", "128kb"] if mediatype=="audio" else ["360p", "720p"]
         })
     return songs
 
@@ -41,13 +48,13 @@ def index():
 
 @app.route("/default_songs")
 def default_songs():
-    songs = fetch_archive_songs(rows=10)
+    songs = fetch_archive_songs(rows=15)
     return jsonify(songs)
 
 @app.route("/search")
 def search():
     query = request.args.get("q", "")
-    songs = fetch_archive_songs(query=query, rows=15)
+    songs = fetch_archive_songs(query=query, rows=20)
     return jsonify(songs)
 
 if __name__ == "__main__":
