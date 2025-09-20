@@ -1,56 +1,56 @@
 from flask import Flask, render_template, request, jsonify
-import requests
-import yt_dlp
 
 app = Flask(__name__)
 
-PIPED_API = "https://piped.kavin.rocks/api/v1"
+# Sample media library (replace/add more from archive.org or other free sources)
+MEDIA_LIBRARY = [
+    {
+        "title": "Meditation Song 1",
+        "artist": "Unknown",
+        "year": 2020,
+        "category": "devotional",
+        "audio_url": "https://archive.org/download/sample-audio/sample1.mp3",
+        "video_url": "https://archive.org/download/sample-video/sample1.mp4",
+        "qualities": ["144p", "360p", "720p"]
+    },
+    {
+        "title": "Comedy Song 1",
+        "artist": "Funny Artist",
+        "year": 2018,
+        "category": "jokes",
+        "audio_url": "https://archive.org/download/sample-audio/sample2.mp3",
+        "video_url": "https://archive.org/download/sample-video/sample2.mp4",
+        "qualities": ["144p", "360p"]
+    },
+    {
+        "title": "Classic Song 90s",
+        "artist": "Old Artist",
+        "year": 1995,
+        "category": "classic",
+        "audio_url": "https://archive.org/download/sample-audio/sample3.mp3",
+        "video_url": "https://archive.org/download/sample-video/sample3.mp4",
+        "qualities": ["144p", "360p", "720p"]
+    }
+]
 
 @app.route("/")
 def index():
     return render_template("index.html")
 
-@app.route("/get_video", methods=["POST"])
-def get_video():
-    url = request.json.get("url")
-    if not url:
-        return jsonify({"error": "No URL provided"}), 400
+@app.route("/search", methods=["GET"])
+def search():
+    query = request.args.get("q", "").lower()
+    category = request.args.get("category", "").lower()
+    results = []
 
-    # Extract video ID for Piped
-    video_id = url.split("watch?v=")[-1].split("&")[0] if "watch?v=" in url else url
-    api_url = f"{PIPED_API}/videos/{video_id}"
+    for item in MEDIA_LIBRARY:
+        if ((query in item["title"].lower()) or
+            (query in item["artist"].lower()) or
+            (query in str(item["year"]))) and \
+           (category in item["category"].lower() or not category):
+            results.append(item)
 
-    # Try fetching from Piped first
-    try:
-        resp = requests.get(api_url, timeout=10)
-        if resp.status_code == 200:
-            data = resp.json()
-            if 'streams' in data and len(data['streams']) > 0:
-                return jsonify(data)
-    except Exception as e:
-        print("Piped failed:", e)
-
-    # Fallback to yt-dlp
-    try:
-        ydl_opts = {
-            "format": "best[ext=mp4]/best",
-            "quiet": True,
-            "skip_download": True,
-        }
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url, download=False)
-            streams = []
-            for f in info.get("formats", []):
-                if f.get("ext") == "mp4" and f.get("url"):
-                    streams.append({
-                        "url": f["url"],
-                        "quality": f.get("format_note"),
-                        "mimeType": f.get("acodec")+"+"+f.get("vcodec")
-                    })
-            return jsonify({"title": info.get("title"), "streams": streams})
-    except Exception as e:
-        print("yt-dlp failed:", e)
-        return jsonify({"error": "Failed to fetch video"}), 500
+    return jsonify(results)
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=10000)
+    app.run(host="0.0.0.0", port=10000, debug=True)
