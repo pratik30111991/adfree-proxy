@@ -52,11 +52,27 @@
             player.playbackRate = 1;
         }
 
+        // Fetch default songs on page load
+        window.onload = function() {
+            fetch("/default_songs")
+                .then(res => res.json())
+                .then(data => {
+                    playlist = data;
+                    currentIndex = 0;
+                    showSidebar(data);
+                    playCurrent();
+                });
+        }
+
         function searchSongs() {
             const query = document.getElementById("searchQuery").value;
             fetch(`/search?q=${encodeURIComponent(query)}`)
                 .then(res => res.json())
                 .then(data => {
+                    if(data.length === 0){
+                        alert("No songs found!");
+                        return;
+                    }
                     playlist = data;
                     currentIndex = 0;
                     showSidebar(data);
