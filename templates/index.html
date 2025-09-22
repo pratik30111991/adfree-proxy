@@ -1,49 +1,44 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Ad-Free Music Player</title>
-  <style>
-    body { font-family: sans-serif; background: #111; color: #fff; }
-    .player { width: 90%; max-width: 600px; margin: 50px auto; }
-    .song-list { margin-top: 20px; max-height: 400px; overflow-y: auto; }
-    .song-item { padding: 10px; cursor: pointer; border-bottom: 1px solid #444; }
-    .song-item:hover { background: #222; }
-    audio { width: 100%; margin-top: 20px; }
-  </style>
+    <title>Ad-Free MP3 Player</title>
+    <style>
+        body { font-family: Arial; background: #f1f1f1; padding: 20px; }
+        .song { margin: 10px 0; }
+        .song a { text-decoration: none; color: #333; }
+        audio { width: 100%; margin-top: 5px; }
+    </style>
 </head>
 <body>
+    <h1>Ad-Free Player</h1>
+    <input type="text" id="search" placeholder="Search artist...">
+    <button onclick="doSearch()">Search</button>
+    <div id="results"></div>
 
-<div class="player">
-  <h2 id="current-title">Select a song</h2>
-  <audio id="audio-player" controls></audio>
-  <div class="song-list" id="song-list"></div>
-</div>
+    <script>
+        async function doSearch() {
+            const artist = document.getElementById('search').value;
+            const res = await fetch(`https://adfree-proxy.onrender.com/search?q=${encodeURIComponent(artist)}`);
+            const data = await res.json();
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '';
 
-<script>
-const artist = "arijit singh"; // change for other artists
-const apiUrl = `https://adfree-proxy.onrender.com/search?q=${encodeURIComponent(artist)}`;
+            if (data.length === 0) {
+                resultsDiv.innerHTML = '<p>No songs found.</p>';
+                return;
+            }
 
-const audioPlayer = document.getElementById("audio-player");
-const songListDiv = document.getElementById("song-list");
-const currentTitle = document.getElementById("current-title");
-
-fetch(apiUrl)
-  .then(res => res.json())
-  .then(data => {
-    data.forEach(song => {
-      const div = document.createElement("div");
-      div.className = "song-item";
-      div.textContent = song.title;
-      div.onclick = () => {
-        audioPlayer.src = song.url;
-        audioPlayer.play();
-        currentTitle.textContent = song.title;
-      };
-      songListDiv.appendChild(div);
-    });
-  })
-  .catch(err => console.error(err));
-</script>
-
+            data.forEach(song => {
+                const div = document.createElement('div');
+                div.className = 'song';
+                div.innerHTML = `<a href="${song.url}" target="_blank">${song.title}</a>
+                                 <audio controls>
+                                     <source src="${song.url}" type="audio/mpeg">
+                                     Your browser does not support the audio element.
+                                 </audio>`;
+                resultsDiv.appendChild(div);
+            });
+        }
+    </script>
 </body>
 </html>
