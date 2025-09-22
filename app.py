@@ -1,3 +1,4 @@
+# app.py
 from flask import Flask, request, jsonify
 import requests
 from bs4 import BeautifulSoup
@@ -6,44 +7,41 @@ app = Flask(__name__)
 
 BASE_URL = "https://wapking.sbs"
 
-@app.route("/")
-def home():
-    return "Ad-Free Music Proxy is Running 🎶"
+def get_songs_from_category(cat_url):
+    songs = []
+    r = requests.get(cat_url)
+    soup = BeautifulSoup(r.text, 'html.parser')
+    for a in soup.select('div.songname a'):
+        title = a.get_text(strip=True)
+        url = a['href']
+        if not url.startswith('http'):
+            url = BASE_URL + url
+        songs.append({"title": title, "url": url})
+    return songs
 
 @app.route("/search")
 def search():
-    query = request.args.get("q")
-    if not query:
-        return jsonify({"error": "No query provided"}), 400
+    query = request.args.get("q", "")
+    result = []
 
-    try:
-        # Wapking search page
-        url = f"{BASE_URL}/site_search.php?query={query.replace(' ', '+')}"
-        headers = {"User-Agent": "Mozilla/5.0"}
-        resp = requests.get(url, headers=headers, timeout=10)
+    # Step 1: fetch categories
+    search_url = f"{BASE_URL}/search.php?search={query.replace(' ','+')}"
+    r = requests.get(search_url)
+    soup = BeautifulSoup(r.text, 'html.parser')
 
-        if resp.status_code != 200:
-            return jsonify([])
+    # Step 2: parse categories
+    for cat in soup.select('div.category a'):
+        cat_title = cat.get_text(strip=True)
+        cat_url = cat['href']
+        if not cat_url.startswith('http'):
+            cat_url = BASE_URL + cat_url
 
-        soup = BeautifulSoup(resp.text, "html.parser")
-        results = []
+        # Step 3: parse songs in this category
+        songs = get_songs_from_category(cat_url)
+        for s in songs:
+            result.append(s)
 
-        # Example: find all links with MP3
-        for link in soup.find_all("a", href=True):
-            href = link["href"]
-            text = link.get_text(strip=True)
-            if "mp3" in href.lower():  # mp3 link filter
-                if not href.startswith("http"):
-                    href = BASE_URL + href
-                results.append({
-                    "title": text,
-                    "url": href
-                })
-
-        return jsonify(results[:20])  # first 20 results only
-
-    except Exception as e:
-        return jsonify({"error": str(e)})
+    return jsonify(result)
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
+    app.run(debug=True)
