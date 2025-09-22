@@ -2,59 +2,62 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<title>Ad-Free Music Player</title>
+<title>Ad-Free Video/Audio Player</title>
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <style>
 :root{
-  --bg:#0b0b0d; --card:#111315; --muted:#9aa0a6; --accent:#1db954; --accent-2:#2aa7ff;
+  --bg:#000; --card:#111; --muted:#aaa; --accent:#1db954; --accent-2:#2aa7ff;
 }
 body{
-  margin:0;font-family:Inter,Arial,Helvetica,sans-serif;
-  background:linear-gradient(180deg,#070709,#0f1213);color:#e6eef3;
+  margin:0; font-family:Arial,Helvetica,sans-serif;
+  background:#000; color:#fff;
 }
-header{padding:20px 24px;display:flex;align-items:center;justify-content:space-between;}
-h1{margin:0;font-size:20px;letter-spacing:0.4px}
-.searchbar{display:flex;gap:10px;align-items:center;}
-input[type=text]{padding:10px 12px;width:420px;border-radius:8px;border:1px solid #222;background:#0c0e10;color:#fff;outline:none;}
-button{background:var(--accent);border:none;padding:10px 12px;border-radius:8px;color:#04110a;cursor:pointer;font-weight:600;}
-.container{display:flex;gap:18px;padding:18px;}
-.main{flex:1;min-width:320px}
-.player-card{background:var(--card);padding:14px;border-radius:12px;box-shadow:0 6px 20px rgba(0,0,0,0.6);}
-video{width:100%;border-radius:8px;height:480px;object-fit:cover;background:#000;}
-.controls{display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap;}
-.controls select,input[type=range]{background:#0b0d0f;border-radius:8px;padding:6px;border:1px solid #222;color:#fff;}
-.controls button.small{padding:8px 10px;background:#222;border-radius:8px;color:#fff;border:1px solid #222;}
-.sidebar{width:320px;max-height:80vh;overflow:auto;padding:8px;background:rgba(10,12,13,0.6);border-radius:12px;}
-.suggestion{display:flex;gap:10px;padding:8px;border-radius:10px;align-items:center;cursor:pointer;margin-bottom:8px;background:transparent;}
-.suggestion img{width:72px;height:54px;object-fit:cover;border-radius:6px;}
-.suggestion .meta{flex:1}
-.suggestion .meta h4{margin:0;font-size:14px}
-.suggestion .meta p{margin:4px 0 0 0;color:var(--muted);font-size:12px}
-.suggestion:hover{background:rgba(255,255,255,0.02)}
-.suggestion.active{outline:2px solid var(--accent);background:linear-gradient(90deg, rgba(29,185,84,0.06), rgba(42,167,255,0.02))}
-.muted{color:var(--muted);font-size:13px}
-@media(max-width:900px){.container{flex-direction:column;padding:12px}.sidebar{width:100%;max-height:35vh;margin-top:12px}input[type=text]{width:60%}}
+header{
+  padding:16px 24px; display:flex; align-items:center; justify-content:space-between;
+}
+h1{margin:0;font-size:22px;}
+.searchbar{display:flex; gap:10px; align-items:center;}
+input[type=text]{padding:10px; width:400px; border-radius:6px; border:1px solid #222; background:#111; color:#fff; outline:none;}
+button{padding:10px 14px; border:none; border-radius:6px; cursor:pointer; font-weight:600;}
+button.main-btn{background:var(--accent); color:#000;}
+button.alt-btn{background:var(--accent-2); color:#000;}
+.container{display:flex; gap:16px; padding:16px;}
+.main{flex:1;}
+.player-card{background:#111; padding:14px; border-radius:10px; box-shadow:0 4px 16px rgba(0,0,0,0.6);}
+video, audio{width:100%; border-radius:8px; background:#000;}
+.controls{display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-top:10px;}
+.controls select,input[type=range]{padding:6px; border-radius:6px; background:#222; border:1px solid #333; color:#fff;}
+.controls button.small{padding:6px 10px; background:#222; border-radius:6px; border:1px solid #333; color:#fff;}
+.sidebar{width:320px; max-height:70vh; overflow:auto; padding:8px; background:#111; border-radius:10px;}
+.suggestion{display:flex; gap:10px; padding:8px; border-radius:6px; align-items:center; cursor:pointer; margin-bottom:6px; background:transparent;}
+.suggestion img{width:72px; height:54px; object-fit:cover; border-radius:6px;}
+.suggestion .meta{flex:1;}
+.suggestion .meta h4{margin:0;font-size:14px;}
+.suggestion .meta p{margin:4px 0 0 0;color:var(--muted); font-size:12px;}
+.suggestion:hover{background:rgba(255,255,255,0.05);}
+.suggestion.active{outline:2px solid var(--accent);}
+.load-more{width:100%; padding:10px; border-radius:6px; border:none; margin-top:6px; background:#222; color:#cfe;}
 </style>
 </head>
 <body>
 <header>
-  <h1>Ad-Free Player — Latest Songs</h1>
+  <h1>Ad-Free Player</h1>
   <div class="searchbar">
-    <input id="q" type="text" placeholder="Search title, artist, year" onkeypress="if(event.key==='Enter'){doSearch();}" />
-    <button onclick="doSearch()">Search</button>
+    <input id="q" type="text" placeholder="Search title or artist" onkeypress="if(event.key==='Enter'){doSearch();}" />
+    <button class="main-btn" onclick="doSearch()">Search</button>
+    <button class="alt-btn" onclick="refreshDefaults()">Latest</button>
   </div>
 </header>
 
 <div class="container">
   <div class="main">
     <div class="player-card">
-      <div id="nowInfo" class="muted">No track loaded</div>
+      <div id="nowInfo" style="font-size:13px; color:var(--muted); margin-bottom:6px;">No track loaded</div>
       <video id="player" controls crossorigin playsinline poster=""></video>
       <div class="controls">
         <button class="small" onclick="prevItem()">◀ Prev</button>
         <button class="small" onclick="playPause()">Play/Pause</button>
         <button class="small" onclick="nextItem()">Next ▶</button>
-
         <label class="muted">Volume</label>
         <input id="vol" type="range" min="0" max="1" step="0.01" value="0.6" onchange="setVolume(this.value)">
         <label class="muted">Speed</label>
@@ -65,62 +68,86 @@ video{width:100%;border-radius:8px;height:480px;object-fit:cover;background:#000
           <option value="1.25">1.25x</option>
           <option value="1.5">1.5x</option>
         </select>
-
         <label class="muted">Quality</label>
         <select id="quality" onchange="changeQuality(this.value)"></select>
       </div>
+      <div style="margin-top:6px;color:var(--muted);font-size:12px;">Click suggestions to play. Latest shows newest uploads.</div>
     </div>
   </div>
-
   <aside class="sidebar" id="sidebar">
-    <h3 style="margin:8px 6px">Suggestions</h3>
+    <h3 style="margin:6px;">Suggestions</h3>
     <div id="list"></div>
+    <button id="loadBtn" class="load-more" onclick="loadMore()">Load more</button>
   </aside>
 </div>
 
 <script>
 let playlist = [];
 let currentIndex = -1;
+let currentPage = 1;
+let lastQuery = "";
 const listEl = document.getElementById("list");
 const player = document.getElementById("player");
 const nowInfo = document.getElementById("nowInfo");
 const qualitySelect = document.getElementById("quality");
 
-window.addEventListener('load', ()=>{ loadSongs(); setVolume(0.6); });
+// === Example placeholder songs (replace with legal embed URLs) ===
+const defaultSongs = [
+  {title:"Song A", artist:"Artist 1", year:"2025", thumbnail:"https://via.placeholder.com/72x54", audio_url:"https://www.w3schools.com/html/horse.mp3", sources:{"mp3":"https://www.w3schools.com/html/horse.mp3"}},
+  {title:"Song B", artist:"Artist 2", year:"2025", thumbnail:"https://via.placeholder.com/72x54", audio_url:"https://www.w3schools.com/html/horse.mp3", sources:{"mp3":"https://www.w3schools.com/html/horse.mp3"}},
+  {title:"Song C", artist:"Artist 3", year:"2025", thumbnail:"https://via.placeholder.com/72x54", audio_url:"https://www.w3schools.com/html/horse.mp3", sources:{"mp3":"https://www.w3schools.com/html/horse.mp3"}}
+];
 
-async function fetchJSON(path){ const r = await fetch(path); return await r.json(); }
+window.addEventListener('load', ()=>{ loadDefaults(); setVolume(0.6); });
 
-async function loadSongs(q="", page=1){
-  const data = await fetchJSON(`/songs?q=${encodeURIComponent(q)}&page=${page}`);
-  if(page===1){ playlist = data; } else { playlist = playlist.concat(data); }
+async function loadDefaults(page=1){
+  currentPage = page; lastQuery="";
+  if(page===1){ playlist = defaultSongs; } else { playlist = playlist.concat(defaultSongs); }
   renderList();
-  if(currentIndex === -1 && playlist.length){ currentIndex=0; playAt(0); }
+  if(currentIndex === -1 && playlist.length){ currentIndex = 0; playAt(currentIndex); }
 }
 
-async function doSearch(){ currentIndex=-1; listEl.innerHTML=""; loadSongs(document.getElementById("q").value.trim(),1); }
+function doSearch(){
+  const q = document.getElementById("q").value.trim();
+  lastQuery = q; currentPage = 1;
+  // For demo: filter defaultSongs by title/artist containing query
+  playlist = defaultSongs.filter(s=>s.title.toLowerCase().includes(q.toLowerCase()) || s.artist.toLowerCase().includes(q.toLowerCase()));
+  renderList();
+  if(playlist.length){ currentIndex=0; playAt(0); } else { nowInfo.innerText="No results"; player.src=""; player.poster=""; }
+}
 
-function renderList(){ listEl.innerHTML=""; playlist.forEach((s,idx)=>appendItem(s,idx)); }
+function loadMore(){
+  currentPage++;
+  playlist = playlist.concat(defaultSongs); // append more placeholder
+  appendList(defaultSongs, playlist.length-defaultSongs.length);
+}
 
-function appendItem(s,idx){
-  const div = document.createElement('div'); div.className='suggestion'; div.dataset.idx=idx;
-  div.onclick=()=>{ currentIndex=idx; playAt(idx); };
-  div.innerHTML=`<img src="${s.thumbnail}" /><div class="meta"><h4>${s.title}</h4><p>${s.artist} • ${s.category}</p></div>`;
-  listEl.appendChild(div);
+function renderList(){ listEl.innerHTML=""; appendList(playlist,0); }
+
+function appendList(items,startIndex){
+  items.forEach((s,i)=>{
+    const idx = startIndex+i;
+    const div = document.createElement('div'); div.className='suggestion'; div.dataset.idx=idx;
+    div.onclick=()=>{ currentIndex=idx; playAt(idx); };
+    div.innerHTML=`<img src="${s.thumbnail}" /><div class="meta"><h4>${s.title}</h4><p>${s.artist} • ${s.year}</p></div>`;
+    listEl.appendChild(div);
+  });
 }
 
 function playAt(idx){
-  if(idx<0||idx>=playlist.length) return;
-  const item = playlist[idx];
-  currentIndex=idx;
-  nowInfo.innerText=`${item.title} • ${item.artist} (${item.year})`;
+  if(idx<0 || idx>=playlist.length) return;
+  const item = playlist[idx]; currentIndex=idx;
+  nowInfo.innerText = `${item.title} • ${item.artist} (${item.year})`;
+  highlightCurrent(idx);
+  player.poster=item.thumbnail;
+  if(item.audio_url){ player.src=item.audio_url; setQualities(item.sources); } else{ player.src=""; }
+  player.play().catch(()=>console.log("Autoplay blocked"));
+}
+
+function highlightCurrent(idx){
   document.querySelectorAll(".suggestion").forEach(el=>el.classList.remove("active"));
   const activeEl = document.querySelector(`.suggestion[data-idx='${idx}']`);
   if(activeEl) activeEl.classList.add("active");
-  player.poster=item.thumbnail;
-  if(item.audio_url){ player.src=item.audio_url; setQualities(item.sources); }
-  else if(item.video_url){ player.src=item.video_url; setQualities(item.sources); }
-  else { player.src=""; }
-  player.play().catch(()=>console.log("Autoplay blocked"));
 }
 
 function prevItem(){ if(currentIndex>0) playAt(currentIndex-1); }
@@ -134,6 +161,7 @@ function setQualities(sources){
   if(qualitySelect.options.length) qualitySelect.selectedIndex=0;
 }
 function changeQuality(q){ if(playlist[currentIndex] && playlist[currentIndex].sources[q]) player.src=playlist[currentIndex].sources[q]; player.play(); }
+function refreshDefaults(){ loadDefaults(1); }
 
 player.addEventListener('ended', ()=>{ nextItem(); });
 </script>
