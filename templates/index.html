@@ -1,44 +1,46 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Ad-Free MP3 Player</title>
-    <style>
-        body { font-family: Arial; background: #f1f1f1; padding: 20px; }
-        .song { margin: 10px 0; }
-        .song a { text-decoration: none; color: #333; }
-        audio { width: 100%; margin-top: 5px; }
-    </style>
+    <title>AdFree Music Player</title>
 </head>
 <body>
-    <h1>Ad-Free Player</h1>
-    <input type="text" id="search" placeholder="Search artist...">
-    <button onclick="doSearch()">Search</button>
-    <div id="results"></div>
+<h2>AdFree Music Player</h2>
+<input type="text" id="searchBox" placeholder="Search song">
+<button onclick="searchSong()">Search</button>
 
-    <script>
-        async function doSearch() {
-            const artist = document.getElementById('search').value;
-            const res = await fetch(`https://adfree-proxy.onrender.com/search?q=${encodeURIComponent(artist)}`);
-            const data = await res.json();
-            const resultsDiv = document.getElementById('results');
-            resultsDiv.innerHTML = '';
+<div id="playerDiv">
+    <audio id="player" controls></audio>
+</div>
 
-            if (data.length === 0) {
-                resultsDiv.innerHTML = '<p>No songs found.</p>';
-                return;
-            }
+<h3>Suggestions</h3>
+<div id="suggestions"></div>
 
-            data.forEach(song => {
-                const div = document.createElement('div');
-                div.className = 'song';
-                div.innerHTML = `<a href="${song.url}" target="_blank">${song.title}</a>
-                                 <audio controls>
-                                     <source src="${song.url}" type="audio/mpeg">
-                                     Your browser does not support the audio element.
-                                 </audio>`;
-                resultsDiv.appendChild(div);
-            });
-        }
-    </script>
+<script>
+async function searchSong() {
+    const query = document.getElementById("searchBox").value;
+    const res = await fetch(`https://adfree-proxy.onrender.com/search?q=${encodeURIComponent(query)}`);
+    const data = await res.json();
+    
+    const suggestionsDiv = document.getElementById("suggestions");
+    suggestionsDiv.innerHTML = "";
+    
+    if(data.length > 0){
+        document.getElementById("player").src = data[0].url;
+        data.forEach(item => {
+            const div = document.createElement("div");
+            div.innerHTML = `<a href="#" onclick="playSong('${item.url}')">${item.title}</a>`;
+            suggestionsDiv.appendChild(div);
+        });
+    } else {
+        suggestionsDiv.innerHTML = "No songs found.";
+    }
+}
+
+function playSong(url){
+    const player = document.getElementById("player");
+    player.src = url;
+    player.play();
+}
+</script>
 </body>
 </html>
