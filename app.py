@@ -5,43 +5,33 @@ from bs4 import BeautifulSoup
 
 app = Flask(__name__)
 
-BASE_URL = "https://wapking.sbs"
+# Popular categories hardcoded (working)
+CATEGORIES = [
+    {"title": "A To Z Bollywood Mp3 Songs", "url": "https://wapking.sbs/categorylist/44/a_to_z_bollywood_mp3_songs/default/1"},
+    {"title": "Hindi Mp3 Songs", "url": "https://wapking.sbs/categorylist/4960/hindi_mp3_songs/default/1"},
+    {"title": "Punjabi Mp3 Song", "url": "https://wapking.sbs/categorylist/4554/punjabi_mp3_song/default/1"},
+    {"title": "Special Mp3 Songs", "url": "https://wapking.sbs/filelist/3376/special_mp3_songs/new2old/1"}
+]
 
-def get_songs_from_category(cat_url):
-    songs = []
-    r = requests.get(cat_url)
-    soup = BeautifulSoup(r.text, 'html.parser')
-    for a in soup.select('div.songname a'):
-        title = a.get_text(strip=True)
-        url = a['href']
-        if not url.startswith('http'):
-            url = BASE_URL + url
-        songs.append({"title": title, "url": url})
-    return songs
-
-@app.route("/search")
+@app.route('/search')
 def search():
-    query = request.args.get("q", "")
-    result = []
+    artist = request.args.get('q', '').lower()
+    results = []
 
-    # Step 1: fetch categories
-    search_url = f"{BASE_URL}/search.php?search={query.replace(' ','+')}"
-    r = requests.get(search_url)
-    soup = BeautifulSoup(r.text, 'html.parser')
+    for cat in CATEGORIES:
+        try:
+            r = requests.get(cat["url"], timeout=10)
+            soup = BeautifulSoup(r.text, "html.parser")
+            songs = soup.select("a.song")  # Correct selector depends on site structure
+            for s in songs:
+                title = s.text.strip()
+                link = s.get("href")
+                if artist in title.lower():
+                    results.append({"title": title, "url": link})
+        except Exception as e:
+            print(f"Error fetching {cat['url']}: {e}")
 
-    # Step 2: parse categories
-    for cat in soup.select('div.category a'):
-        cat_title = cat.get_text(strip=True)
-        cat_url = cat['href']
-        if not cat_url.startswith('http'):
-            cat_url = BASE_URL + cat_url
+    return jsonify(results)
 
-        # Step 3: parse songs in this category
-        songs = get_songs_from_category(cat_url)
-        for s in songs:
-            result.append(s)
-
-    return jsonify(result)
-
-if __name__ == "__main__":
-    app.run(debug=True)
+if __name__ == '__main__':
+    app.run(host="0.0.0.0", port=10000)
