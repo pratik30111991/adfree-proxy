@@ -1,275 +1,109 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8" />
-<title>Ad-Free Player — Archive-powered</title>
-<meta name="viewport" content="width=device-width,initial-scale=1" />
-<style>
-  :root{
-    --bg:#0b0b0d; --card:#111315; --muted:#9aa0a6; --accent:#1db954;
-    --accent-2:#2aa7ff;
-  }
-  body{margin:0;font-family:Inter,Arial,Helvetica,sans-serif;background:linear-gradient(180deg,#070709,#0f1213);color:#e6eef3}
-  header{padding:20px 24px;display:flex;align-items:center;justify-content:space-between}
-  h1{margin:0;font-size:20px;letter-spacing:0.4px}
-  .searchbar{display:flex;gap:10px;align-items:center}
-  input[type=text]{padding:10px 12px;width:420px;border-radius:8px;border:1px solid #222;background:#0c0e10;color:#fff;outline:none}
-  button{background:var(--accent);border:none;padding:10px 12px;border-radius:8px;color:#04110a;cursor:pointer;font-weight:600}
-  .container{display:flex;gap:18px;padding:18px}
-  .main{flex:1;min-width:320px}
-  .player-card{background:var(--card);padding:14px;border-radius:12px;box-shadow:0 6px 20px rgba(0,0,0,0.6)}
-  video{width:100%;border-radius:8px;background:#000}
-  .controls{display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap}
-  .controls select,input[type=range]{background:#0b0d0f;border-radius:8px;padding:6px;border:1px solid #222;color:#fff}
-  .controls button.small{padding:8px 10px;background:#222;border-radius:8px;color:#fff;border:1px solid #222}
-  .sidebar{width:320px;max-height:70vh;overflow:auto;padding:8px;background:rgba(10,12,13,0.6);border-radius:12px}
-  .suggestion{display:flex;gap:10px;padding:8px;border-radius:10px;align-items:center;cursor:pointer;margin-bottom:8px;background:transparent}
-  .suggestion img{width:72px;height:54px;object-fit:cover;border-radius:6px}
-  .suggestion .meta{flex:1}
-  .suggestion .meta h4{margin:0;font-size:14px}
-  .suggestion .meta p{margin:4px 0 0 0;color:var(--muted);font-size:12px}
-  .suggestion:hover{background:rgba(255,255,255,0.02)}
-  .suggestion.active{outline:2px solid var(--accent);background:linear-gradient(90deg, rgba(29,185,84,0.06), rgba(42,167,255,0.02))}
-  .load-more{width:100%;padding:10px;border-radius:8px;border:none;margin-top:6px;background:#202425;color:#cfe}
-  .muted{color:var(--muted);font-size:13px}
-  @media(max-width:900px){
-    .container{flex-direction:column;padding:12px}
-    .sidebar{width:100%;max-height:35vh;margin-top:12px}
-    input[type=text]{width:60%}
-  }
-</style>
+  <meta charset="UTF-8" />
+  <title>Ad-Free Music Player</title>
+  <style>
+    body{margin:0;font-family:sans-serif;background:#111;color:#eee;display:flex;flex-direction:column;height:100vh}
+    header{background:#222;padding:8px;text-align:center}
+    #q{width:60%;padding:8px;border-radius:6px;border:none}
+    main{flex:1;display:flex;overflow:hidden}
+    video{width:100%;border-radius:8px;background:#000;max-height:360px}
+    .player{flex:3;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:10px}
+    .controls{margin-top:10px;display:flex;gap:10px;align-items:center}
+    .sidebar{flex:1;width:320px;max-height:60vh;overflow:auto;padding:8px;background:rgba(10,12,13,0.6);border-radius:12px}
+    .song{padding:6px;cursor:pointer;display:flex;gap:8px;border-bottom:1px solid #333}
+    .song:hover{background:#333}
+    .song img{width:60px;height:60px;object-fit:cover;border-radius:4px}
+    .active{background:#444 !important}
+  </style>
 </head>
 <body>
-<header>
-  <h1>Ad-Free Player — Archive.org Library</h1>
-  <div class="searchbar">
-    <input id="q" type="text" placeholder="Search title, artist, year (e.g. 'classic 1995')" />
+  <header>
+    <input id="q" type="text" placeholder="Search..." 
+           onkeypress="if(event.key==='Enter'){doSearch();}" />
     <button onclick="doSearch()">Search</button>
-    <button style="background:var(--accent-2)" onclick="refreshDefaults()">Latest</button>
-  </div>
-</header>
-
-<div class="container">
-  <div class="main">
-    <div class="player-card">
-      <div id="nowInfo" class="muted">No track loaded</div>
-      <video id="player" controls crossorigin playsinline></video>
-
+  </header>
+  <main>
+    <div class="player">
+      <video id="player" controls autoplay></video>
       <div class="controls">
-        <button class="small" onclick="prevItem()">◀ Prev</button>
-        <button class="small" onclick="playPause()">Play/Pause</button>
-        <button class="small" onclick="nextItem()">Next ▶</button>
-
-        <label class="muted">Volume</label>
-        <input id="vol" type="range" min="0" max="1" step="0.01" value="0.6" onchange="setVolume(this.value)">
-
-        <label class="muted">Speed</label>
-        <select id="speed" onchange="setSpeed(this.value)">
-          <option value="0.5">0.5x</option>
-          <option value="0.75">0.75x</option>
-          <option value="1" selected>1x</option>
-          <option value="1.25">1.25x</option>
-          <option value="1.5">1.5x</option>
-        </select>
-
-        <label class="muted">Quality</label>
-        <select id="quality" onchange="changeQuality(this.value)"></select>
-
-        <div style="flex:1"></div>
-        <div class="muted">Auto-updates latest →</div>
+        <button onclick="prev()">⏮️</button>
+        <button onclick="playPause()">⏯️</button>
+        <button onclick="next()">⏭️</button>
+        <label>Quality:
+          <select id="qualitySelect" onchange="changeQuality()"></select>
+        </label>
       </div>
-
-      <div style="margin-top:8px;color:var(--muted);font-size:13px">
-        Tip: click items from Suggestions to play. Use Latest for newest uploads.
-      </div>
+      <div id="nowInfo"></div>
     </div>
-  </div>
+    <div class="sidebar" id="sidebar"></div>
+  </main>
+  <script>
+    let playlist=[], currentIndex=0;
+    const player=document.getElementById("player");
+    const sidebar=document.getElementById("sidebar");
+    const qualitySelect=document.getElementById("qualitySelect");
+    const nowInfo=document.getElementById("nowInfo");
 
-  <aside class="sidebar" id="sidebar">
-    <h3 style="margin:8px 6px">Suggestions</h3>
-    <div id="list"></div>
-    <button id="loadBtn" class="load-more" onclick="loadMore()">Load more</button>
-    <div id="endMarker" style="height:8px"></div>
-  </aside>
-</div>
-
-<script>
-let playlist = [];
-let currentIndex = -1;
-let currentPage = 1;
-let lastQuery = "";
-const listEl = document.getElementById("list");
-const player = document.getElementById("player");
-const nowInfo = document.getElementById("nowInfo");
-const qualitySelect = document.getElementById("quality");
-
-// initial load
-window.addEventListener('load', ()=>{ loadDefaults(); setupScroll(); setVolume(0.6); });
-
-function fetchJSON(path){
-  return fetch(path).then(r=>r.json());
-}
-
-async function loadDefaults(page=1){
-  currentPage = page;
-  lastQuery = "";
-  const data = await fetchJSON(`/default_songs?page=${page}`);
-  if(page===1){ playlist = data; } else { playlist = playlist.concat(data); }
-  renderList();
-  if(currentIndex === -1 && playlist.length) { currentIndex = 0; playAt(currentIndex); }
-}
-
-async function doSearch(){
-  const q = document.getElementById("q").value.trim();
-  lastQuery = q;
-  currentPage = 1;
-  const data = await fetchJSON(`/search?q=${encodeURIComponent(q)}&page=1`);
-  playlist = data; renderList();
-  if(playlist.length){ currentIndex = 0; playAt(0); } else { nowInfo.innerText = "No results"; player.src=""; }
-}
-
-async function loadMore(){
-  currentPage++;
-  const endpoint = lastQuery ? `/search?q=${encodeURIComponent(lastQuery)}&page=${currentPage}` : `/default_songs?page=${currentPage}`;
-  const data = await fetchJSON(endpoint);
-  if(data && data.length){
-    const start = playlist.length;
-    playlist = playlist.concat(data);
-    appendList(data, start);
-  } else {
-    document.getElementById("loadBtn").innerText = "No more results";
-    document.getElementById("loadBtn").disabled = true;
-  }
-}
-
-function renderList(){
-  listEl.innerHTML = "";
-  appendList(playlist, 0);
-}
-
-function appendList(items, startIndex){
-  for(let i=0;i<items.length;i++){
-    const idx = startIndex + i;
-    const s = items[i];
-    const div = document.createElement('div');
-    div.className = 'suggestion';
-    div.dataset.idx = idx;
-    div.onclick = ()=>{ playAt(idx); scrollActiveIntoView(); };
-
-    const img = document.createElement('img');
-    img.src = s.thumbnail || 'https://via.placeholder.com/72x54';
-    img.onerror = ()=>{ img.src='https://via.placeholder.com/72x54'; };
-
-    const meta = document.createElement('div'); meta.className='meta';
-    const h = document.createElement('h4'); h.innerText = s.title || 'Unknown';
-    const p = document.createElement('p'); p.innerHTML = `${s.artist || ''} • ${s.year || ''} <span style="color:#9aa0a6">• ${s.category}</span>`;
-    meta.appendChild(h); meta.appendChild(p);
-
-    div.appendChild(img); div.appendChild(meta);
-    listEl.appendChild(div);
-  }
-  highlightActive();
-}
-
-function playAt(i){
-  if(i<0 || i>=playlist.length) return;
-  currentIndex = i;
-  const item = playlist[i];
-  highlightActive();
-  nowInfo.innerText = `${item.title} — ${item.artist} (${item.year})`;
-  // pick type audio/video based on available urls
-  const src = item.video_url || item.audio_url || "";
-  if(!src){ alert('No playable file for this item'); return; }
-  // populate quality select
-  qualitySelect.innerHTML = "";
-  if(item.qualities && item.qualities.length){
-    item.qualities.forEach(q=>{
-      const o = document.createElement('option'); o.value = q; o.textContent = q; qualitySelect.appendChild(o);
-    });
-  } else {
-    const o = document.createElement('option'); o.value = 'default'; o.textContent='default'; qualitySelect.appendChild(o);
-  }
-  // choose default quality: first
-  qualitySelect.value = item.qualities && item.qualities[0] ? item.qualities[0] : qualitySelect.options[0].value;
-  setSourceForQuality(item, qualitySelect.value);
-  player.play().catch(()=>{ /* autoplay might be blocked on some browsers */});
-}
-
-function setSourceForQuality(item, quality){
-  // best-effort mapping: archive filenames include bitrate or resolution labels
-  // backend already filled audio_url/video_url with a representative url; but we also included available qualities.
-  // If multiple qualities existed, we attempt to swap by replacing label in URL (convention used by many archive items).
-  let url = item.audio_url || item.video_url;
-  if(item.qualities && item.qualities.length>0){
-    // try to find a URL matching that quality
-    const q = quality;
-    // look for direct file in metadata URL if present as substring
-    // simple heuristic: try replacing any known tokens or append _<q> when mp3.
-    if(url.endsWith('.mp3') && q.match(/\d+k|mp3/)){
-      // try to replace numeric bitrate token
-      const replaced = url.replace(/(_?\d{2,3}k)?\.mp3$/, `_${q}.mp3`);
-      url = replaced;
-    } else if(url.endsWith('.mp4') && q.match(/\d{3,4}p|mp4/)){
-      const replaced = url.replace(/(_?\d{3,4}p)?\.mp4$/, `_${q}.mp4`);
-      url = replaced;
+    async function doSearch(){
+      const q=document.getElementById("q").value;
+      const res=await fetch(`/search?q=${encodeURIComponent(q)}`);
+      const data=await res.json();
+      playlist=data.results;
+      sidebar.innerHTML="";
+      playlist.forEach((s,i)=>{
+        const div=document.createElement("div");
+        div.className="song";
+        div.onclick=()=>playAt(i);
+        div.innerHTML=`<img src="${s.thumbnail}"/><div><b>${s.title}</b><br>${s.artist} (${s.year})</div>`;
+        sidebar.appendChild(div);
+      });
+      if(playlist.length) playAt(0);
     }
-  }
-  player.src = url;
-  player.load();
-}
 
-function changeQuality(val){
-  const item = playlist[currentIndex];
-  if(!item) return;
-  setSourceForQuality(item, val);
-  player.play().catch(()=>{});
-}
-
-function prevItem(){ if(currentIndex>0) playAt(currentIndex-1); }
-function nextItem(){ if(currentIndex+1 < playlist.length) playAt(currentIndex+1); }
-
-function setVolume(v){ player.volume = parseFloat(v); document.getElementById('vol').value = v; }
-function setSpeed(v){ player.playbackRate = parseFloat(v); }
-
-function playPause(){ if(player.paused) player.play(); else player.pause(); }
-
-function highlightActive(){
-  const items = document.querySelectorAll('.suggestion');
-  items.forEach(el=>{
-    el.classList.toggle('active', Number(el.dataset.idx) === currentIndex);
-  });
-}
-
-function scrollActiveIntoView(){
-  const active = document.querySelector('.suggestion.active');
-  if(active) active.scrollIntoView({behavior:'smooth',block:'center'});
-}
-
-function setupScroll(){
-  // basic "load more on near-bottom"
-  const sidebar = document.querySelector('.sidebar');
-  sidebar.addEventListener('scroll', ()=>{
-    if(sidebar.scrollTop + sidebar.clientHeight >= sidebar.scrollHeight - 120){
-      // near bottom
-      if(!document.getElementById('loadBtn').disabled){
-        loadMore();
+    function playAt(i){
+      if(i<0 || i>=playlist.length) return;
+      currentIndex=i;
+      const item=playlist[i];
+      highlightActive();
+      nowInfo.innerText=`${item.title} — ${item.artist} (${item.year})`;
+      qualitySelect.innerHTML="";
+      if(item.qualities && item.qualities.length){
+        item.qualities.forEach(q=>{
+          const o=document.createElement('option');
+          o.value=q; o.textContent=q;
+          qualitySelect.appendChild(o);
+        });
       }
+      setSourceForQuality(item, qualitySelect.value || null);
     }
-  });
-}
 
-function refreshDefaults(){ // force reload latest first page
-  document.getElementById('loadBtn').disabled = false; document.getElementById('loadBtn').innerText='Load more';
-  playlist = []; currentPage=1; currentIndex=-1; listEl.innerHTML=''; loadDefaults(1);
-}
+    function setSourceForQuality(item, quality){
+      let url="";
+      if(quality && item.sources && item.sources[quality]){
+        url=item.sources[quality];
+      } else {
+        url=item.video_url || item.audio_url;
+      }
+      if(!url){alert("No playable source");return;}
+      player.src=url;
+      player.load();
+      player.play();
+    }
 
-// keyboard space to toggle play/pause (when not focused in an input)
-window.addEventListener('keydown', (e)=>{
-  const tag = document.activeElement.tagName.toLowerCase();
-  if(e.code === 'Space' && tag !== 'input' && tag != 'textarea'){
-    e.preventDefault(); playPause();
-  }
-});
-</script>
+    function changeQuality(){
+      const item=playlist[currentIndex];
+      setSourceForQuality(item, qualitySelect.value);
+    }
+
+    function playPause(){player.paused?player.play():player.pause();}
+    function next(){if(currentIndex<playlist.length-1)playAt(currentIndex+1);}
+    function prev(){if(currentIndex>0)playAt(currentIndex-1);}
+
+    function highlightActive(){
+      [...sidebar.children].forEach((c,idx)=>c.classList.toggle("active",idx===currentIndex));
+    }
+  </script>
 </body>
 </html>
