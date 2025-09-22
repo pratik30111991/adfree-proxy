@@ -1,4 +1,3 @@
-# app.py
 from flask import Flask, request, jsonify
 import requests
 from bs4 import BeautifulSoup
@@ -16,7 +15,7 @@ def search_songs(query):
     try:
         r = requests.get(search_url, headers=headers, timeout=10)
         soup = BeautifulSoup(r.text, 'html.parser')
-        items = soup.select("div.list div.item a")  # adjust according to site
+        items = soup.select("div.list div.item a")  # adjust if site structure changes
         for item in items:
             title = item.text.strip()
             url = item['href']
