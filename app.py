@@ -1,47 +1,70 @@
 from flask import Flask, render_template, request, jsonify
 import requests
 from bs4 import BeautifulSoup
+import re
 
 app = Flask(__name__)
 
-# Demo streaming site (replace with a legal streaming URL if needed)
-STREAM_SITE = "https://wapking.sbs/search/{}"
+BASE_URL = "https://wapking.sbs"
 
-def fetch_stream_songs(query="", page=1):
-    """Fetch songs/videos from a streaming site via scraping"""
-    if not query:
-        query = "latest"
-    url = STREAM_SITE.format(query.replace(" ", "+"))
+def scrape_wapking(query="", page=1):
+    """Scrape WapKing for songs"""
     results = []
-
     try:
-        resp = requests.get(url, timeout=12)
+        if query:
+            search_url = f"{BASE_URL}/search?query={query}&page={page}"
+        else:
+            search_url = f"{BASE_URL}/latest?page={page}"
+
+        headers = {"User-Agent": "Mozilla/5.0"}
+        resp = requests.get(search_url, headers=headers, timeout=10)
         resp.raise_for_status()
         soup = BeautifulSoup(resp.text, "html.parser")
 
-        # Parse songs/videos
-        items = soup.select(".song-box")  # adjust selector based on site structure
+        # Find song blocks
+        items = soup.select(".song-item")  # Inspect WapKing HTML for correct class
         for item in items:
-            title_tag = item.select_one(".title")
-            thumb_tag = item.select_one("img")
+            title_tag = item.select_one(".song-title")
+            artist_tag = item.select_one(".song-artist")
             link_tag = item.select_one("a")
-            if title_tag and link_tag:
-                results.append({
-                    "title": title_tag.text.strip(),
-                    "video_url": link_tag["href"],
-                    "thumbnail": thumb_tag["src"] if thumb_tag else "",
-                    "sources": { "default": link_tag["href"] }
-                })
-    except Exception as e:
-        print("Error fetching songs:", e)
+            img_tag = item.select_one("img")
 
+            if not title_tag or not link_tag:
+                continue
+
+            title = title_tag.get_text(strip=True)
+            artist = artist_tag.get_text(strip=True) if artist_tag else "Unknown"
+            song_page = BASE_URL + link_tag["href"]
+            thumbnail = img_tag["src"] if img_tag else ""
+
+            # Get actual audio URL from song page
+            try:
+                page_resp = requests.get(song_page, headers=headers, timeout=10)
+                page_resp.raise_for_status()
+                page_soup = BeautifulSoup(page_resp.text, "html.parser")
+                audio_tag = page_soup.select_one("audio source")
+                audio_url = audio_tag["src"] if audio_tag else ""
+            except:
+                audio_url = ""
+
+            results.append({
+                "title": title,
+                "artist": artist,
+                "video_url": audio_url,
+                "audio_url": audio_url,
+                "thumbnail": thumbnail,
+                "sources": { "default": audio_url }
+            })
+    except Exception as e:
+        print("Error scraping WapKing:", e)
     return results
 
 @app.route("/songs")
 def songs():
-    q = request.args.get("q", "")
+    q = request.args.get("q", "").strip()
     page = int(request.args.get("page", 1))
-    return jsonify(fetch_stream_songs(query=q, page=page))
+    data = scrape_wapking(query=q, page=page)
+    return jsonify(data)
 
 @app.route("/")
 def index():
