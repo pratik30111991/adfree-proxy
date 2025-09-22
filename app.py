@@ -1,6 +1,5 @@
 from flask import Flask, render_template, request, jsonify
 import requests
-import re
 
 app = Flask(__name__)
 
@@ -12,7 +11,7 @@ def fetch_archive_songs(query="", rows=15, page=1):
     if query:
         q = f'(title:("{query}") OR creator:("{query}") OR subject:("{query}"))'
     else:
-        q = 'mediatype:(audio OR video)'
+        q = 'mediatype:audio'  # Only audio for latest
 
     params = {
         "q": q,
@@ -45,30 +44,23 @@ def fetch_archive_songs(query="", rows=15, page=1):
         files = meta.get("files", [])
         audio_url, video_url, thumbnail = "", "", ""
         audio_map, video_map = {}, {}
-        audio_qualities, video_qualities = [], []
 
         for f in files:
             name = f.get("name", "")
             fmt = f.get("format", "").lower()
-            if not name:
+            size = f.get("size", 0)
+            if not name or size < 1000000:  # Skip tiny ringtones
                 continue
             url = f"https://archive.org/download/{identifier}/{name}"
 
-            # Audio
             if "mp3" in fmt or "ogg" in fmt:
                 audio_url = url
                 q_label = f.get("bitrate") or "mp3"
-                audio_qualities.append(q_label)
                 audio_map[q_label] = url
-
-            # Video
             elif "mpeg4" in fmt or "h.264" in fmt or "matroska" in fmt or "webm" in fmt:
                 video_url = url
                 q_label = f.get("height") or "mp4"
-                video_qualities.append(str(q_label))
                 video_map[str(q_label)] = url
-
-            # Thumbnail
             if not thumbnail and ("jpg" in fmt or "png" in fmt):
                 thumbnail = url
 
@@ -85,7 +77,6 @@ def fetch_archive_songs(query="", rows=15, page=1):
             "audio_url": audio_url or "",
             "video_url": video_url or "",
             "thumbnail": thumbnail,
-            "qualities": audio_qualities if audio_qualities else video_qualities,
             "sources": {**audio_map, **video_map}
         })
 
