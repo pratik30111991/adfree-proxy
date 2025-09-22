@@ -8,6 +8,7 @@ ARCHIVE_API = "https://archive.org/advancedsearch.php"
 METADATA_API = "https://archive.org/metadata/{}"
 
 def fetch_archive_songs(query="", rows=15, page=1):
+    """Fetch songs from archive.org (audio/video)"""
     if query:
         q = f'(title:("{query}") OR creator:("{query}") OR subject:("{query}"))'
     else:
@@ -16,7 +17,7 @@ def fetch_archive_songs(query="", rows=15, page=1):
     params = {
         "q": q,
         "fl[]": ["identifier", "title", "creator", "date", "mediatype", "description"],
-        "sort[]": "date desc",
+        "sort[]": "publicdate desc",
         "rows": rows,
         "page": page,
         "output": "json"
@@ -42,36 +43,38 @@ def fetch_archive_songs(query="", rows=15, page=1):
             continue
 
         files = meta.get("files", [])
-        audio_map = {}
-        video_map = {}
+        audio_url, video_url, thumbnail = "", "", ""
+        audio_map, video_map = {}, {}
+        audio_qualities, video_qualities = [], []
 
         for f in files:
             name = f.get("name", "")
             fmt = f.get("format", "").lower()
-            direct = f"https://archive.org/download/{identifier}/{name}"
+            if not name:
+                continue
+            url = f"https://archive.org/download/{identifier}/{name}"
 
-            if name.endswith(".mp3") or "audio" in fmt:
-                m = re.search(r'(\d{2,3}k)\.mp3$', name)
-                if m:
-                    audio_map[m.group(1)] = direct
-                else:
-                    audio_map.setdefault("mp3", direct)
+            # Audio
+            if "mp3" in fmt or "ogg" in fmt:
+                audio_url = url
+                q_label = f.get("bitrate") or "mp3"
+                audio_qualities.append(q_label)
+                audio_map[q_label] = url
 
-            if name.endswith(".mp4") or "video" in fmt:
-                m2 = re.search(r'(\d{3,4}p)\.mp4$', name)
-                if m2:
-                    video_map[m2.group(1)] = direct
-                else:
-                    video_map.setdefault("mp4", direct)
+            # Video
+            elif "mpeg4" in fmt or "h.264" in fmt or "matroska" in fmt or "webm" in fmt:
+                video_url = url
+                q_label = f.get("height") or "mp4"
+                video_qualities.append(str(q_label))
+                video_map[str(q_label)] = url
 
-        audio_url = next(iter(audio_map.values()), "")
-        video_url = next(iter(video_map.values()), "")
-        audio_qualities = list(audio_map.keys())
-        video_qualities = list(video_map.keys())
-        if not audio_url and not video_url:
-            continue
+            # Thumbnail
+            if not thumbnail and ("jpg" in fmt or "png" in fmt):
+                thumbnail = url
 
-        thumbnail = f"https://archive.org/services/img/{identifier}"
+        if not thumbnail:
+            thumbnail = f"https://archive.org/services/img/{identifier}"
+
         results.append({
             "id": identifier,
             "title": d.get("title", "Unknown"),
@@ -82,14 +85,11 @@ def fetch_archive_songs(query="", rows=15, page=1):
             "audio_url": audio_url or "",
             "video_url": video_url or "",
             "thumbnail": thumbnail,
-            "qualities": audio_qualities if audio_qualities else video_qualities
+            "qualities": audio_qualities if audio_qualities else video_qualities,
+            "sources": {**audio_map, **video_map}
         })
 
     return results
-
-@app.route("/")
-def index():
-    return render_template("index.html")
 
 @app.route("/default_songs")
 def default_songs():
@@ -101,10 +101,12 @@ def default_songs():
 def search():
     q = request.args.get("q", "")
     page = int(request.args.get("page", 1))
-    songs = fetch_archive_songs(query=q, rows=20, page=page)
+    songs = fetch_archive_songs(query=q, rows=15, page=page)
     return jsonify(songs)
 
+@app.route("/")
+def index():
+    return render_template("index.html")
+
 if __name__ == "__main__":
-    import os
-    port = int(os.environ.get("PORT", 10000))
-    app.run(host="0.0.0.0", port=port, debug=False)
+    app.run(host="0.0.0.0", port=10000, debug=True)
