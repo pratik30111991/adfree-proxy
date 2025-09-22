@@ -1,106 +1,275 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<title>Ad-Free Music & Video Player</title>
+<meta charset="utf-8" />
+<title>Ad-Free Player — Archive-powered</title>
+<meta name="viewport" content="width=device-width,initial-scale=1" />
 <style>
-body { font-family: Arial; background: #111; color: #fff; text-align: center; }
-audio, video { width: 80%; margin-top: 20px; }
-input { width: 60%; padding: 10px; margin-top: 20px; }
-button { padding: 10px 20px; margin-left: 10px; cursor: pointer; }
-.controls { margin-top: 10px; }
-.sidebar { float: right; width: 25%; text-align: left; background: #222; padding: 10px; max-height: 80vh; overflow-y: scroll;}
-.song-item { margin: 5px 0; cursor: pointer; display:flex; align-items:center; }
-.song-item img { width:50px; height:50px; margin-right:10px; object-fit:cover; }
-select { margin-left: 10px; }
+  :root{
+    --bg:#0b0b0d; --card:#111315; --muted:#9aa0a6; --accent:#1db954;
+    --accent-2:#2aa7ff;
+  }
+  body{margin:0;font-family:Inter,Arial,Helvetica,sans-serif;background:linear-gradient(180deg,#070709,#0f1213);color:#e6eef3}
+  header{padding:20px 24px;display:flex;align-items:center;justify-content:space-between}
+  h1{margin:0;font-size:20px;letter-spacing:0.4px}
+  .searchbar{display:flex;gap:10px;align-items:center}
+  input[type=text]{padding:10px 12px;width:420px;border-radius:8px;border:1px solid #222;background:#0c0e10;color:#fff;outline:none}
+  button{background:var(--accent);border:none;padding:10px 12px;border-radius:8px;color:#04110a;cursor:pointer;font-weight:600}
+  .container{display:flex;gap:18px;padding:18px}
+  .main{flex:1;min-width:320px}
+  .player-card{background:var(--card);padding:14px;border-radius:12px;box-shadow:0 6px 20px rgba(0,0,0,0.6)}
+  video{width:100%;border-radius:8px;background:#000}
+  .controls{display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap}
+  .controls select,input[type=range]{background:#0b0d0f;border-radius:8px;padding:6px;border:1px solid #222;color:#fff}
+  .controls button.small{padding:8px 10px;background:#222;border-radius:8px;color:#fff;border:1px solid #222}
+  .sidebar{width:320px;max-height:70vh;overflow:auto;padding:8px;background:rgba(10,12,13,0.6);border-radius:12px}
+  .suggestion{display:flex;gap:10px;padding:8px;border-radius:10px;align-items:center;cursor:pointer;margin-bottom:8px;background:transparent}
+  .suggestion img{width:72px;height:54px;object-fit:cover;border-radius:6px}
+  .suggestion .meta{flex:1}
+  .suggestion .meta h4{margin:0;font-size:14px}
+  .suggestion .meta p{margin:4px 0 0 0;color:var(--muted);font-size:12px}
+  .suggestion:hover{background:rgba(255,255,255,0.02)}
+  .suggestion.active{outline:2px solid var(--accent);background:linear-gradient(90deg, rgba(29,185,84,0.06), rgba(42,167,255,0.02))}
+  .load-more{width:100%;padding:10px;border-radius:8px;border:none;margin-top:6px;background:#202425;color:#cfe}
+  .muted{color:var(--muted);font-size:13px}
+  @media(max-width:900px){
+    .container{flex-direction:column;padding:12px}
+    .sidebar{width:100%;max-height:35vh;margin-top:12px}
+    input[type=text]{width:60%}
+  }
 </style>
 </head>
 <body>
-<h1>Ad-Free Music & Video Player</h1>
-<input type="text" id="searchQuery" placeholder="Search by title, artist, year">
-<button onclick="searchSongs()">Search</button>
+<header>
+  <h1>Ad-Free Player — Archive.org Library</h1>
+  <div class="searchbar">
+    <input id="q" type="text" placeholder="Search title, artist, year (e.g. 'classic 1995')" />
+    <button onclick="doSearch()">Search</button>
+    <button style="background:var(--accent-2)" onclick="refreshDefaults()">Latest</button>
+  </div>
+</header>
 
-<div style="display:flex;">
-<div style="flex:1;">
-<video id="player" controls autoplay></video>
-<div class="controls">
-<button onclick="prevSong()">Prev</button>
-<button onclick="nextSong()">Next</button>
-Volume: <input type="range" id="volume" min="0" max="1" step="0.01" onchange="setVolume(this.value)">
-Speed: <select id="speed" onchange="setSpeed(this.value)">
-<option value="0.5">0.5x</option>
-<option value="1" selected>1x</option>
-<option value="1.5">1.5x</option>
-<option value="2">2x</option>
-</select>
-Quality: <select id="quality" onchange="setQuality(this.value)"></select>
-</div>
-</div>
+<div class="container">
+  <div class="main">
+    <div class="player-card">
+      <div id="nowInfo" class="muted">No track loaded</div>
+      <video id="player" controls crossorigin playsinline></video>
 
-<div class="sidebar" id="sidebar">
-<h3>Suggestions</h3>
-</div>
+      <div class="controls">
+        <button class="small" onclick="prevItem()">◀ Prev</button>
+        <button class="small" onclick="playPause()">Play/Pause</button>
+        <button class="small" onclick="nextItem()">Next ▶</button>
+
+        <label class="muted">Volume</label>
+        <input id="vol" type="range" min="0" max="1" step="0.01" value="0.6" onchange="setVolume(this.value)">
+
+        <label class="muted">Speed</label>
+        <select id="speed" onchange="setSpeed(this.value)">
+          <option value="0.5">0.5x</option>
+          <option value="0.75">0.75x</option>
+          <option value="1" selected>1x</option>
+          <option value="1.25">1.25x</option>
+          <option value="1.5">1.5x</option>
+        </select>
+
+        <label class="muted">Quality</label>
+        <select id="quality" onchange="changeQuality(this.value)"></select>
+
+        <div style="flex:1"></div>
+        <div class="muted">Auto-updates latest →</div>
+      </div>
+
+      <div style="margin-top:8px;color:var(--muted);font-size:13px">
+        Tip: click items from Suggestions to play. Use Latest for newest uploads.
+      </div>
+    </div>
+  </div>
+
+  <aside class="sidebar" id="sidebar">
+    <h3 style="margin:8px 6px">Suggestions</h3>
+    <div id="list"></div>
+    <button id="loadBtn" class="load-more" onclick="loadMore()">Load more</button>
+    <div id="endMarker" style="height:8px"></div>
+  </aside>
 </div>
 
 <script>
 let playlist = [];
-let currentIndex = 0;
-let currentQuality = "";
-let currentType = "audio"; // audio or video
-
-function loadDefaultSongs() {
-fetch('/default_songs').then(res => res.json()).then(data => {
-playlist = data; currentIndex=0; showSidebar(data); playCurrent();
-});
-}
-
-function searchSongs() {
-const query = document.getElementById("searchQuery").value;
-fetch(`/search?q=${encodeURIComponent(query)}`).then(res=>res.json()).then(data=>{
-playlist=data; currentIndex=0; showSidebar(data); playCurrent();
-});
-}
-
-function showSidebar(songs) {
-const sidebar = document.getElementById("sidebar");
-sidebar.innerHTML = "<h3>Suggestions</h3>";
-songs.forEach((s,i)=>{
-const div = document.createElement("div"); div.className="song-item";
-div.innerHTML=`<img src="${s.thumbnail}" onerror="this.src='https://via.placeholder.com/50'"/> 
-<div>${s.title} (${s.year})<br>${s.artist}</div>`;
-div.onclick=()=>{currentIndex=i; playCurrent();};
-sidebar.appendChild(div);
-});
-}
-
-function playCurrent() {
-if(playlist.length===0) return;
-const song = playlist[currentIndex];
+let currentIndex = -1;
+let currentPage = 1;
+let lastQuery = "";
+const listEl = document.getElementById("list");
 const player = document.getElementById("player");
-currentType = song.category=="audio"?"audio":"video";
-
-player.src = (currentType=="audio") ? song.audio_url : song.video_url;
-player.play();
-
-// populate quality
+const nowInfo = document.getElementById("nowInfo");
 const qualitySelect = document.getElementById("quality");
-qualitySelect.innerHTML="";
-song.qualities.forEach(q=>{
-const option=document.createElement("option");
-option.value=q; option.textContent=q;
-qualitySelect.appendChild(option);
-});
-currentQuality = song.qualities[0];
-qualitySelect.value=currentQuality;
+
+// initial load
+window.addEventListener('load', ()=>{ loadDefaults(); setupScroll(); setVolume(0.6); });
+
+function fetchJSON(path){
+  return fetch(path).then(r=>r.json());
 }
 
-function nextSong(){ if(currentIndex+1<playlist.length){currentIndex++; playCurrent();} }
-function prevSong(){ if(currentIndex-1>=0){currentIndex--; playCurrent();} }
-function setVolume(v){ document.getElementById("player").volume=v; }
-function setSpeed(s){ document.getElementById("player").playbackRate=s; }
-function setQuality(q){ currentQuality=q; playCurrent(); }
+async function loadDefaults(page=1){
+  currentPage = page;
+  lastQuery = "";
+  const data = await fetchJSON(`/default_songs?page=${page}`);
+  if(page===1){ playlist = data; } else { playlist = playlist.concat(data); }
+  renderList();
+  if(currentIndex === -1 && playlist.length) { currentIndex = 0; playAt(currentIndex); }
+}
 
-loadDefaultSongs();
+async function doSearch(){
+  const q = document.getElementById("q").value.trim();
+  lastQuery = q;
+  currentPage = 1;
+  const data = await fetchJSON(`/search?q=${encodeURIComponent(q)}&page=1`);
+  playlist = data; renderList();
+  if(playlist.length){ currentIndex = 0; playAt(0); } else { nowInfo.innerText = "No results"; player.src=""; }
+}
+
+async function loadMore(){
+  currentPage++;
+  const endpoint = lastQuery ? `/search?q=${encodeURIComponent(lastQuery)}&page=${currentPage}` : `/default_songs?page=${currentPage}`;
+  const data = await fetchJSON(endpoint);
+  if(data && data.length){
+    const start = playlist.length;
+    playlist = playlist.concat(data);
+    appendList(data, start);
+  } else {
+    document.getElementById("loadBtn").innerText = "No more results";
+    document.getElementById("loadBtn").disabled = true;
+  }
+}
+
+function renderList(){
+  listEl.innerHTML = "";
+  appendList(playlist, 0);
+}
+
+function appendList(items, startIndex){
+  for(let i=0;i<items.length;i++){
+    const idx = startIndex + i;
+    const s = items[i];
+    const div = document.createElement('div');
+    div.className = 'suggestion';
+    div.dataset.idx = idx;
+    div.onclick = ()=>{ playAt(idx); scrollActiveIntoView(); };
+
+    const img = document.createElement('img');
+    img.src = s.thumbnail || 'https://via.placeholder.com/72x54';
+    img.onerror = ()=>{ img.src='https://via.placeholder.com/72x54'; };
+
+    const meta = document.createElement('div'); meta.className='meta';
+    const h = document.createElement('h4'); h.innerText = s.title || 'Unknown';
+    const p = document.createElement('p'); p.innerHTML = `${s.artist || ''} • ${s.year || ''} <span style="color:#9aa0a6">• ${s.category}</span>`;
+    meta.appendChild(h); meta.appendChild(p);
+
+    div.appendChild(img); div.appendChild(meta);
+    listEl.appendChild(div);
+  }
+  highlightActive();
+}
+
+function playAt(i){
+  if(i<0 || i>=playlist.length) return;
+  currentIndex = i;
+  const item = playlist[i];
+  highlightActive();
+  nowInfo.innerText = `${item.title} — ${item.artist} (${item.year})`;
+  // pick type audio/video based on available urls
+  const src = item.video_url || item.audio_url || "";
+  if(!src){ alert('No playable file for this item'); return; }
+  // populate quality select
+  qualitySelect.innerHTML = "";
+  if(item.qualities && item.qualities.length){
+    item.qualities.forEach(q=>{
+      const o = document.createElement('option'); o.value = q; o.textContent = q; qualitySelect.appendChild(o);
+    });
+  } else {
+    const o = document.createElement('option'); o.value = 'default'; o.textContent='default'; qualitySelect.appendChild(o);
+  }
+  // choose default quality: first
+  qualitySelect.value = item.qualities && item.qualities[0] ? item.qualities[0] : qualitySelect.options[0].value;
+  setSourceForQuality(item, qualitySelect.value);
+  player.play().catch(()=>{ /* autoplay might be blocked on some browsers */});
+}
+
+function setSourceForQuality(item, quality){
+  // best-effort mapping: archive filenames include bitrate or resolution labels
+  // backend already filled audio_url/video_url with a representative url; but we also included available qualities.
+  // If multiple qualities existed, we attempt to swap by replacing label in URL (convention used by many archive items).
+  let url = item.audio_url || item.video_url;
+  if(item.qualities && item.qualities.length>0){
+    // try to find a URL matching that quality
+    const q = quality;
+    // look for direct file in metadata URL if present as substring
+    // simple heuristic: try replacing any known tokens or append _<q> when mp3.
+    if(url.endsWith('.mp3') && q.match(/\d+k|mp3/)){
+      // try to replace numeric bitrate token
+      const replaced = url.replace(/(_?\d{2,3}k)?\.mp3$/, `_${q}.mp3`);
+      url = replaced;
+    } else if(url.endsWith('.mp4') && q.match(/\d{3,4}p|mp4/)){
+      const replaced = url.replace(/(_?\d{3,4}p)?\.mp4$/, `_${q}.mp4`);
+      url = replaced;
+    }
+  }
+  player.src = url;
+  player.load();
+}
+
+function changeQuality(val){
+  const item = playlist[currentIndex];
+  if(!item) return;
+  setSourceForQuality(item, val);
+  player.play().catch(()=>{});
+}
+
+function prevItem(){ if(currentIndex>0) playAt(currentIndex-1); }
+function nextItem(){ if(currentIndex+1 < playlist.length) playAt(currentIndex+1); }
+
+function setVolume(v){ player.volume = parseFloat(v); document.getElementById('vol').value = v; }
+function setSpeed(v){ player.playbackRate = parseFloat(v); }
+
+function playPause(){ if(player.paused) player.play(); else player.pause(); }
+
+function highlightActive(){
+  const items = document.querySelectorAll('.suggestion');
+  items.forEach(el=>{
+    el.classList.toggle('active', Number(el.dataset.idx) === currentIndex);
+  });
+}
+
+function scrollActiveIntoView(){
+  const active = document.querySelector('.suggestion.active');
+  if(active) active.scrollIntoView({behavior:'smooth',block:'center'});
+}
+
+function setupScroll(){
+  // basic "load more on near-bottom"
+  const sidebar = document.querySelector('.sidebar');
+  sidebar.addEventListener('scroll', ()=>{
+    if(sidebar.scrollTop + sidebar.clientHeight >= sidebar.scrollHeight - 120){
+      // near bottom
+      if(!document.getElementById('loadBtn').disabled){
+        loadMore();
+      }
+    }
+  });
+}
+
+function refreshDefaults(){ // force reload latest first page
+  document.getElementById('loadBtn').disabled = false; document.getElementById('loadBtn').innerText='Load more';
+  playlist = []; currentPage=1; currentIndex=-1; listEl.innerHTML=''; loadDefaults(1);
+}
+
+// keyboard space to toggle play/pause (when not focused in an input)
+window.addEventListener('keydown', (e)=>{
+  const tag = document.activeElement.tagName.toLowerCase();
+  if(e.code === 'Space' && tag !== 'input' && tag != 'textarea'){
+    e.preventDefault(); playPause();
+  }
+});
 </script>
 </body>
 </html>
