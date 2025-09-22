@@ -11,7 +11,7 @@ def fetch_archive_songs(query="", rows=15, page=1):
     if query:
         q = f'(title:("{query}") OR creator:("{query}") OR subject:("{query}"))'
     else:
-        q = 'mediatype:audio'  # Only audio for latest
+        q = 'mediatype:audio'
 
     params = {
         "q": q,
@@ -49,8 +49,16 @@ def fetch_archive_songs(query="", rows=15, page=1):
             name = f.get("name", "")
             fmt = f.get("format", "").lower()
             size = f.get("size", 0)
-            if not name or size < 1000000:  # Skip tiny ringtones
+            
+            # Fix TypeError: convert string size to int
+            try:
+                size = int(size)
+            except (ValueError, TypeError):
+                size = 0
+
+            if not name or size < 1000000:  # skip tiny files
                 continue
+
             url = f"https://archive.org/download/{identifier}/{name}"
 
             if "mp3" in fmt or "ogg" in fmt:
