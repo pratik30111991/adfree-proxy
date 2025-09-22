@@ -6,12 +6,12 @@ app = Flask(__name__)
 ARCHIVE_API = "https://archive.org/advancedsearch.php"
 METADATA_API = "https://archive.org/metadata/{}"
 
-def fetch_archive_songs(query="", rows=15, page=1):
+def fetch_archive_songs(query="", rows=50, page=1):
     """Fetch songs from archive.org (audio/video)"""
     if query:
         q = f'(title:("{query}") OR creator:("{query}") OR subject:("{query}"))'
     else:
-        q = 'mediatype:audio'
+        q = 'mediatype:audio OR mediatype:movies'
 
     params = {
         "q": q,
@@ -49,26 +49,16 @@ def fetch_archive_songs(query="", rows=15, page=1):
             name = f.get("name", "")
             fmt = f.get("format", "").lower()
             size = f.get("size", 0)
-            
-            # Fix TypeError: convert string size to int
-            try:
-                size = int(size)
-            except (ValueError, TypeError):
-                size = 0
-
-            if not name or size < 1000000:  # skip tiny files
+            if not name or size < 1000000:  # Skip tiny files
                 continue
-
             url = f"https://archive.org/download/{identifier}/{name}"
 
             if "mp3" in fmt or "ogg" in fmt:
                 audio_url = url
-                q_label = f.get("bitrate") or "mp3"
-                audio_map[q_label] = url
-            elif "mpeg4" in fmt or "h.264" in fmt or "matroska" in fmt or "webm" in fmt:
+                audio_map[f.get("bitrate") or "mp3"] = url
+            elif "mp4" in fmt or "mpeg4" in fmt or "webm" in fmt or "h.264" in fmt:
                 video_url = url
-                q_label = f.get("height") or "mp4"
-                video_map[str(q_label)] = url
+                video_map[str(f.get("height") or "mp4")] = url
             if not thumbnail and ("jpg" in fmt or "png" in fmt):
                 thumbnail = url
 
@@ -90,18 +80,11 @@ def fetch_archive_songs(query="", rows=15, page=1):
 
     return results
 
-@app.route("/default_songs")
-def default_songs():
-    page = int(request.args.get("page", 1))
-    songs = fetch_archive_songs(query="", rows=15, page=page)
-    return jsonify(songs)
-
-@app.route("/search")
-def search():
+@app.route("/songs")
+def songs():
     q = request.args.get("q", "")
     page = int(request.args.get("page", 1))
-    songs = fetch_archive_songs(query=q, rows=15, page=page)
-    return jsonify(songs)
+    return jsonify(fetch_archive_songs(query=q, rows=50, page=page))
 
 @app.route("/")
 def index():
