@@ -1,286 +1,55 @@
-<!-- templates/index.html -->
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <title>Ad-Free Player — WapKing-powered</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta charset="UTF-8">
+  <title>Ad-Free Music Player 🎵</title>
   <style>
-    :root{
-      --bg:#0f1720; --card:#0b1220; --muted:#9aa0a6; --accent:#ff3b3b; --accent-2:#2aa7ff;
-    }
-    body{margin:0;font-family:Inter,Arial,Helvetica,sans-serif;background:linear-gradient(180deg,#071019,#0f1720);color:#e6eef3}
-    header{padding:18px 22px;display:flex;align-items:center;justify-content:space-between;gap:12px}
-    h1{margin:0;font-size:18px}
-    .searchbar{display:flex;gap:8px;align-items:center}
-    input[type=text]{padding:10px 12px;width:420px;border-radius:10px;border:1px solid #233244;background:#071727;color:#fff;outline:none}
-    button{background:var(--accent);border:none;padding:10px 12px;border-radius:8px;color:#fff;cursor:pointer;font-weight:600}
-    .container{display:flex;gap:18px;padding:18px}
-    .main{flex:1;min-width:320px}
-    .player-card{background:linear-gradient(180deg,#071424,#0b2130);padding:14px;border-radius:12px;box-shadow:0 6px 30px rgba(0,0,0,0.6)}
-    .player-hero{position:relative;border-radius:10px;overflow:hidden;background:#000;height:420px;display:flex;align-items:center;justify-content:center}
-    .player-hero img.poster{width:100%;height:100%;object-fit:cover;filter:brightness(0.45) saturate(0.9)}
-    .player-hero .overlay{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;align-items:center;padding:20px}
-    .player-hero .title{font-size:20px;font-weight:700;margin-bottom:8px}
-    .player-hero .controls{display:flex;gap:10px;align-items:center}
-    .player-hero button.big{padding:12px 18px;border-radius:999px;border:none;background:var(--accent);color:#fff;font-weight:700;cursor:pointer}
-    .player-hero audio, .player-hero video{display:none;width:0;height:0}
-    .controls-bar{display:flex;gap:8px;align-items:center;margin-top:12px;flex-wrap:wrap}
-    .sidebar{width:360px;max-height:78vh;overflow:auto;padding:12px;background:rgba(255,255,255,0.02);border-radius:12px}
-    .suggestion{display:flex;gap:10px;padding:8px;border-radius:8px;align-items:center;cursor:pointer;margin-bottom:8px;background:transparent}
-    .suggestion img{width:84px;height:54px;object-fit:cover;border-radius:6px}
-    .suggestion .meta{flex:1}
-    .suggestion .meta h4{margin:0;font-size:14px}
-    .suggestion .meta p{margin:4px 0 0 0;color:var(--muted);font-size:12px}
-    .suggestion:hover{background:rgba(255,255,255,0.02)}
-    .suggestion.active{outline:2px solid var(--accent);background:linear-gradient(90deg, rgba(255,59,59,0.06), rgba(42,167,255,0.02))}
-    .load-more{width:100%;padding:10px;border-radius:8px;border:none;margin-top:6px;background:#162533;color:#cfe}
-    .muted{color:var(--muted);font-size:13px}
-    @media(max-width:1000px){
-      .container{flex-direction:column;padding:12px}
-      .sidebar{width:100%;max-height:35vh}
-      input[type=text]{width:60%}
-    }
+    body { font-family: Arial, sans-serif; background:#111; color:#fff; margin:0; }
+    #player { width:100%; padding:20px; text-align:center; background:#222; }
+    audio { width:80%; margin-top:10px; }
+    #suggestions { padding:20px; display:grid; grid-template-columns: repeat(auto-fill,minmax(250px,1fr)); gap:15px; }
+    .song { background:#333; padding:10px; border-radius:10px; cursor:pointer; transition:0.3s; }
+    .song:hover { background:#555; }
   </style>
 </head>
 <body>
-  <header>
-    <h1>Ad-Free Player — WapKing source</h1>
-    <div class="searchbar">
-      <input id="q" type="text" placeholder="Search (e.g. Saiyaara Juke Box) — press Enter" onkeypress="if(event.key==='Enter'){doSearch();}" />
-      <button onclick="doSearch()">Search</button>
-      <button style="background:var(--accent-2)" onclick="refreshDefaults()">Latest</button>
-    </div>
-  </header>
-
-  <div class="container">
-    <div class="main">
-      <div class="player-card">
-        <div id="nowInfo" class="muted">No track loaded</div>
-
-        <div class="player-hero">
-          <img id="poster" class="poster" src="" alt="poster" />
-          <div class="overlay">
-            <div class="title" id="playerTitle">Ad-Free Player</div>
-            <div class="controls">
-              <button class="big" onclick="prevItem()">◀ Prev</button>
-              <button class="big" id="playBtn" onclick="playPause()">Play</button>
-              <button class="big" onclick="nextItem()">Next ▶</button>
-            </div>
-            <div style="margin-top:12px" class="muted">Auto-updates latest • Uses wapking.sbs listings</div>
-          </div>
-
-          <!-- invisible players (we swap src and show/hide as needed) -->
-          <audio id="audioPlayer" crossorigin playsinline></audio>
-          <video id="videoPlayer" crossorigin playsinline style="display:none"></video>
-        </div>
-
-        <div class="controls-bar">
-          <label class="muted">Volume</label>
-          <input id="vol" type="range" min="0" max="1" step="0.01" value="0.7" onchange="setVolume(this.value)">
-          <label class="muted">Speed</label>
-          <select id="speed" onchange="setSpeed(this.value)">
-            <option value="0.5">0.5x</option>
-            <option value="0.75">0.75x</option>
-            <option value="1" selected>1x</option>
-            <option value="1.25">1.25x</option>
-            <option value="1.5">1.5x</option>
-          </select>
-          <label class="muted">Quality</label>
-          <select id="quality" onchange="changeQuality(this.value)"></select>
-          <div style="flex:1"></div>
-          <div class="muted">Tip: click suggestions to play</div>
-        </div>
-
-      </div>
-    </div>
-
-    <aside class="sidebar" id="sidebar">
-      <h3 style="margin:8px 6px">Suggestions</h3>
-      <div id="list"></div>
-      <div id="endMarker" style="height:20px"></div>
-      <button id="loadBtn" class="load-more" onclick="manualLoadMore()">Load more</button>
-    </aside>
+  <div id="player">
+    <h2 id="nowPlaying">🎶 Select a Song</h2>
+    <audio id="audioPlayer" controls></audio>
   </div>
 
-<script>
-/* Frontend player logic */
-let playlist = [];
-let currentIndex = -1;
-let currentPage = 1;
-let lastQuery = "";
-const listEl = document.getElementById("list");
-const audioPlayer = document.getElementById("audioPlayer");
-const videoPlayer = document.getElementById("videoPlayer");
-const poster = document.getElementById("poster");
-const playerTitle = document.getElementById("playerTitle");
-const nowInfo = document.getElementById("nowInfo");
-const qualitySelect = document.getElementById("quality");
-const loadBtn = document.getElementById("loadBtn");
+  <div id="suggestions"></div>
 
-window.addEventListener('load', ()=>{ loadDefaults(); setVolume(0.7); });
+  <script>
+    async function loadSongs(query="arijit singh") {
+      const res = await fetch(`https://adfree-proxy.onrender.com/search?q=${encodeURIComponent(query)}`);
+      const data = await res.json();
+      const container = document.getElementById("suggestions");
+      container.innerHTML = "";
 
-async function fetchJSON(path){
-  try {
-    const r = await fetch(path);
-    return await r.json();
-  } catch (e) {
-    console.error("fetchJSON error", e);
-    return [];
-  }
-}
+      if (!data || data.length === 0) {
+        container.innerHTML = "<p>No songs found 😢</p>";
+        return;
+      }
 
-async function loadDefaults(page=1){
-  currentPage = page;
-  lastQuery = "";
-  const data = await fetchJSON(`/default_songs?page=${page}`);
-  if(page===1){ playlist = data; } else { playlist = playlist.concat(data); }
-  renderList();
-  if(currentIndex === -1 && playlist.length) { currentIndex = 0; playAt(currentIndex); }
-}
-
-async function doSearch(){
-  const q = document.getElementById("q").value.trim();
-  if(!q) return;
-  lastQuery = q;
-  currentPage = 1;
-  const data = await fetchJSON(`/search?q=${encodeURIComponent(q)}&page=1`);
-  playlist = data; renderList();
-  if(playlist.length){ currentIndex = 0; playAt(0); } else { nowInfo.innerText = "No results"; clearPlayers(); }
-}
-
-async function loadMore(){
-  currentPage++;
-  const endpoint = lastQuery ? `/search?q=${encodeURIComponent(lastQuery)}&page=${currentPage}` : `/default_songs?page=${currentPage}`;
-  const data = await fetchJSON(endpoint);
-  if(data && data.length){
-    const start = playlist.length;
-    playlist = playlist.concat(data);
-    appendList(data, start);
-  } else {
-    loadBtn.innerText = "No more results";
-    loadBtn.disabled = true;
-  }
-}
-
-function manualLoadMore(){ loadMore(); }
-
-// infinite auto-load using IntersectionObserver
-const sentinel = document.getElementById('endMarker');
-const io = new IntersectionObserver(entries=>{
-  entries.forEach(entry=>{
-    if(entry.isIntersecting){
-      // auto load next page when user scrolls to bottom of suggestions
-      loadMore();
+      data.forEach(song => {
+        const div = document.createElement("div");
+        div.className = "song";
+        div.innerHTML = `<strong>${song.title}</strong>`;
+        div.onclick = () => playSong(song);
+        container.appendChild(div);
+      });
     }
-  });
-},{root:null,rootMargin:'400px',threshold:0.1});
-io.observe(sentinel);
 
-function renderList(){ listEl.innerHTML=""; appendList(playlist,0); }
+    function playSong(song) {
+      document.getElementById("nowPlaying").innerText = "Now Playing: " + song.title;
+      const player = document.getElementById("audioPlayer");
+      player.src = song.url;
+      player.play();
+    }
 
-function appendList(items, startIndex){
-  for(let i=0;i<items.length;i++){
-    const idx = startIndex+i;
-    const s = items[i];
-    const div = document.createElement('div'); div.className='suggestion'; div.dataset.idx=idx;
-    div.onclick=()=>{ currentIndex = idx; playAt(idx); };
-    const thumb = s.thumbnail || (s.sources && Object.values(s.sources)[0]) || "";
-    div.innerHTML=`<img src="${thumb}" onerror="this.src='https://via.placeholder.com/160x100?text=No+Image'"/><div class="meta"><h4>${s.title}</h4><p>${s.artist || ''} • ${s.category || ''}</p></div>`;
-    listEl.appendChild(div);
-  }
-}
-
-function playAt(idx){
-  if(idx<0 || idx>=playlist.length) return;
-  const item = playlist[idx];
-  currentIndex = idx;
-  nowInfo.innerText = `${item.title} ${item.artist?(' • '+item.artist):''}`;
-  highlightCurrent(idx);
-  poster.src = item.thumbnail || '';
-  playerTitle.innerText = item.title || 'Track';
-
-  // prefer video if video_url present
-  const videoUrl = item.video_url || "";
-  const audioUrl = item.audio_url || (item.sources && Object.values(item.sources)[0]) || "";
-
-  // stop both
-  audioPlayer.pause(); videoPlayer.pause();
-  audioPlayer.src = ""; videoPlayer.src = "";
-
-  if(videoUrl){
-    videoPlayer.style.display = "";
-    audioPlayer.style.display = "none";
-    videoPlayer.src = videoUrl;
-    videoPlayer.play().catch(()=>console.log("Autoplay blocked"));
-  } else if(audioUrl){
-    videoPlayer.style.display = "none";
-    audioPlayer.style.display = "";
-    audioPlayer.src = audioUrl;
-    audioPlayer.play().catch(()=>console.log("Autoplay blocked"));
-  } else {
-    clearPlayers();
-  }
-
-  setQualities(item.sources || {"default": audioUrl || videoUrl});
-}
-
-function clearPlayers(){
-  audioPlayer.src = "";
-  videoPlayer.src = "";
-  poster.src = "";
-}
-
-function highlightCurrent(idx){
-  document.querySelectorAll(".suggestion").forEach(el=>el.classList.remove("active"));
-  const activeEl = document.querySelector(`.suggestion[data-idx='${idx}']`);
-  if(activeEl) activeEl.classList.add("active");
-}
-
-function prevItem(){ if(currentIndex>0) playAt(currentIndex-1); }
-function nextItem(){ if(currentIndex+1<playlist.length) playAt(currentIndex+1); }
-
-function playPause(){
-  if(audioPlayer.style.display !== "none"){
-    if(audioPlayer.paused) audioPlayer.play(); else audioPlayer.pause();
-  } else {
-    if(videoPlayer.paused) videoPlayer.play(); else videoPlayer.pause();
-  }
-}
-
-function setVolume(v){ 
-  audioPlayer.volume=v; videoPlayer.volume=v;
-}
-function setSpeed(s){ audioPlayer.playbackRate = s; videoPlayer.playbackRate = s; }
-
-function setQualities(sources){
-  qualitySelect.innerHTML="";
-  if(!sources) return;
-  Object.keys(sources).forEach(q=>{
-    const opt = document.createElement("option");
-    opt.value = q; opt.innerText = q;
-    qualitySelect.appendChild(opt);
-  });
-  if(qualitySelect.options.length) qualitySelect.selectedIndex=0;
-}
-function changeQuality(q){ 
-  if(!playlist[currentIndex]) return;
-  const item = playlist[currentIndex];
-  const url = item.sources && item.sources[q];
-  if(!url) return;
-  // swap current player
-  if(item.category === "video" || /\.(mp4|webm|mkv)$/i.test(url)){
-    videoPlayer.src = url; videoPlayer.play();
-  } else {
-    audioPlayer.src = url; audioPlayer.play();
-  }
-}
-
-function refreshDefaults(){ currentPage = 1; playlist = []; loadDefaults(1); }
-
-audioPlayer.addEventListener('ended', ()=>{ nextItem(); });
-videoPlayer.addEventListener('ended', ()=>{ nextItem(); });
-
-</script>
+    // Load default songs on page load
+    loadSongs();
+  </script>
 </body>
 </html>
