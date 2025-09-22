@@ -1,66 +1,50 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8" />
-<title>Ad-Free Video/Audio Player</title>
-<meta name="viewport" content="width=device-width,initial-scale=1" />
+<meta charset="utf-8">
+<title>Ad-Free Video Player</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <style>
-:root{
-  --bg:#000; --card:#111; --muted:#aaa; --accent:#1db954; --accent-2:#2aa7ff;
-}
-body{
-  margin:0; font-family:Arial,Helvetica,sans-serif;
-  background:#000; color:#fff;
-}
-header{
-  padding:16px 24px; display:flex; align-items:center; justify-content:space-between;
-}
-h1{margin:0;font-size:22px;}
-.searchbar{display:flex; gap:10px; align-items:center;}
-input[type=text]{padding:10px; width:400px; border-radius:6px; border:1px solid #222; background:#111; color:#fff; outline:none;}
-button{padding:10px 14px; border:none; border-radius:6px; cursor:pointer; font-weight:600;}
-button.main-btn{background:var(--accent); color:#000;}
-button.alt-btn{background:var(--accent-2); color:#000;}
-.container{display:flex; gap:16px; padding:16px;}
+:root {--bg:#0b0b0d; --card:#111315; --muted:#9aa0a6; --accent:#1db954;}
+body{margin:0;font-family:Arial;background:var(--bg);color:#fff;}
+header{display:flex;justify-content:space-between;padding:16px;}
+input[type=text]{padding:10px 12px;border-radius:6px;border:none;width:60%;}
+button{padding:10px 14px;border-radius:6px;border:none;background:var(--accent);color:#000;cursor:pointer;}
+.container{display:flex;gap:16px;padding:16px;}
 .main{flex:1;}
-.player-card{background:#111; padding:14px; border-radius:10px; box-shadow:0 4px 16px rgba(0,0,0,0.6);}
-video, audio{width:100%; border-radius:8px; background:#000;}
-.controls{display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-top:10px;}
-.controls select,input[type=range]{padding:6px; border-radius:6px; background:#222; border:1px solid #333; color:#fff;}
-.controls button.small{padding:6px 10px; background:#222; border-radius:6px; border:1px solid #333; color:#fff;}
-.sidebar{width:320px; max-height:70vh; overflow:auto; padding:8px; background:#111; border-radius:10px;}
-.suggestion{display:flex; gap:10px; padding:8px; border-radius:6px; align-items:center; cursor:pointer; margin-bottom:6px; background:transparent;}
-.suggestion img{width:72px; height:54px; object-fit:cover; border-radius:6px;}
-.suggestion .meta{flex:1;}
-.suggestion .meta h4{margin:0;font-size:14px;}
-.suggestion .meta p{margin:4px 0 0 0;color:var(--muted); font-size:12px;}
-.suggestion:hover{background:rgba(255,255,255,0.05);}
+.player-card{background:var(--card);padding:14px;border-radius:12px;box-shadow:0 6px 20px rgba(0,0,0,0.6);}
+video{width:100%;border-radius:8px;background:#000;height:400px;object-fit:cover;}
+.controls{display:flex;gap:8px;align-items:center;margin-top:10px;}
+.controls select,input[type=range]{border-radius:6px;padding:6px;border:none;background:#222;color:#fff;}
+.sidebar{width:300px;max-height:80vh;overflow:auto;background:#111;padding:8px;border-radius:12px;}
+.suggestion{display:flex;gap:8px;cursor:pointer;margin-bottom:8px;padding:6px;border-radius:8px;}
+.suggestion img{width:80px;height:60px;object-fit:cover;border-radius:6px;}
 .suggestion.active{outline:2px solid var(--accent);}
-.load-more{width:100%; padding:10px; border-radius:6px; border:none; margin-top:6px; background:#222; color:#cfe;}
+.load-more{width:100%;padding:10px;border-radius:6px;background:#222;color:#fff;border:none;margin-top:6px;}
 </style>
 </head>
 <body>
 <header>
   <h1>Ad-Free Player</h1>
-  <div class="searchbar">
-    <input id="q" type="text" placeholder="Search title or artist" onkeypress="if(event.key==='Enter'){doSearch();}" />
-    <button class="main-btn" onclick="doSearch()">Search</button>
-    <button class="alt-btn" onclick="refreshDefaults()">Latest</button>
+  <div>
+    <input id="q" type="text" placeholder="Search videos" onkeypress="if(event.key==='Enter') doSearch();">
+    <button onclick="doSearch()">Search</button>
+    <button onclick="refreshDefaults()">Latest</button>
   </div>
 </header>
 
 <div class="container">
   <div class="main">
     <div class="player-card">
-      <div id="nowInfo" style="font-size:13px; color:var(--muted); margin-bottom:6px;">No track loaded</div>
+      <div id="nowInfo">No video loaded</div>
       <video id="player" controls crossorigin playsinline poster=""></video>
       <div class="controls">
-        <button class="small" onclick="prevItem()">◀ Prev</button>
-        <button class="small" onclick="playPause()">Play/Pause</button>
-        <button class="small" onclick="nextItem()">Next ▶</button>
-        <label class="muted">Volume</label>
+        <button onclick="prevItem()">◀ Prev</button>
+        <button onclick="playPause()">Play/Pause</button>
+        <button onclick="nextItem()">Next ▶</button>
+        <label>Volume</label>
         <input id="vol" type="range" min="0" max="1" step="0.01" value="0.6" onchange="setVolume(this.value)">
-        <label class="muted">Speed</label>
+        <label>Speed</label>
         <select id="speed" onchange="setSpeed(this.value)">
           <option value="0.5">0.5x</option>
           <option value="0.75">0.75x</option>
@@ -68,103 +52,53 @@ video, audio{width:100%; border-radius:8px; background:#000;}
           <option value="1.25">1.25x</option>
           <option value="1.5">1.5x</option>
         </select>
-        <label class="muted">Quality</label>
+        <label>Quality</label>
         <select id="quality" onchange="changeQuality(this.value)"></select>
       </div>
-      <div style="margin-top:6px;color:var(--muted);font-size:12px;">Click suggestions to play. Latest shows newest uploads.</div>
     </div>
   </div>
   <aside class="sidebar" id="sidebar">
-    <h3 style="margin:6px;">Suggestions</h3>
+    <h3>Suggestions</h3>
     <div id="list"></div>
-    <button id="loadBtn" class="load-more" onclick="loadMore()">Load more</button>
+    <button class="load-more" onclick="loadMore()">Load more</button>
   </aside>
 </div>
 
 <script>
-let playlist = [];
-let currentIndex = -1;
-let currentPage = 1;
-let lastQuery = "";
-const listEl = document.getElementById("list");
-const player = document.getElementById("player");
-const nowInfo = document.getElementById("nowInfo");
-const qualitySelect = document.getElementById("quality");
+let playlist=[],currentIndex=-1,currentPage=1,lastQuery="";
+const player=document.getElementById("player");
+const listEl=document.getElementById("list");
+const nowInfo=document.getElementById("nowInfo");
+const qualitySelect=document.getElementById("quality");
 
-// === Example placeholder songs (replace with legal embed URLs) ===
-const defaultSongs = [
-  {title:"Song A", artist:"Artist 1", year:"2025", thumbnail:"https://via.placeholder.com/72x54", audio_url:"https://www.w3schools.com/html/horse.mp3", sources:{"mp3":"https://www.w3schools.com/html/horse.mp3"}},
-  {title:"Song B", artist:"Artist 2", year:"2025", thumbnail:"https://via.placeholder.com/72x54", audio_url:"https://www.w3schools.com/html/horse.mp3", sources:{"mp3":"https://www.w3schools.com/html/horse.mp3"}},
-  {title:"Song C", artist:"Artist 3", year:"2025", thumbnail:"https://via.placeholder.com/72x54", audio_url:"https://www.w3schools.com/html/horse.mp3", sources:{"mp3":"https://www.w3schools.com/html/horse.mp3"}}
-];
+window.addEventListener('load',()=>{loadDefaults();setVolume(0.6);});
 
-window.addEventListener('load', ()=>{ loadDefaults(); setVolume(0.6); });
+async function fetchJSON(path){const r=await fetch(path);return await r.json();}
+async function loadDefaults(page=1){currentPage=page;lastQuery="";const data=await fetchJSON(`/default_videos?page=${page}`);
+if(page===1){playlist=data;}else{playlist=playlist.concat(data);}
+renderList();if(currentIndex===-1&&playlist.length){currentIndex=0;playAt(currentIndex);}}
 
-async function loadDefaults(page=1){
-  currentPage = page; lastQuery="";
-  if(page===1){ playlist = defaultSongs; } else { playlist = playlist.concat(defaultSongs); }
-  renderList();
-  if(currentIndex === -1 && playlist.length){ currentIndex = 0; playAt(currentIndex); }
-}
+async function doSearch(){const q=document.getElementById("q").value.trim();lastQuery=q;currentPage=1;
+const data=await fetchJSON(`/search?q=${encodeURIComponent(q)}&page=1`);playlist=data;renderList();
+if(playlist.length){currentIndex=0;playAt(0);}else{nowInfo.innerText="No results";player.src="";player.poster="";}}
 
-function doSearch(){
-  const q = document.getElementById("q").value.trim();
-  lastQuery = q; currentPage = 1;
-  // For demo: filter defaultSongs by title/artist containing query
-  playlist = defaultSongs.filter(s=>s.title.toLowerCase().includes(q.toLowerCase()) || s.artist.toLowerCase().includes(q.toLowerCase()));
-  renderList();
-  if(playlist.length){ currentIndex=0; playAt(0); } else { nowInfo.innerText="No results"; player.src=""; player.poster=""; }
-}
+async function loadMore(){currentPage++;const endpoint=lastQuery?`/search?q=${encodeURIComponent(lastQuery)}&page=${currentPage}`:`/default_videos?page=${currentPage}`;
+const data=await fetchJSON(endpoint);if(data&&data.length){playlist=playlist.concat(data);appendList(data,playlist.length-data.length);}else{document.querySelector(".load-more").innerText="No more results";document.querySelector(".load-more").disabled=true;}}
 
-function loadMore(){
-  currentPage++;
-  playlist = playlist.concat(defaultSongs); // append more placeholder
-  appendList(defaultSongs, playlist.length-defaultSongs.length);
-}
-
-function renderList(){ listEl.innerHTML=""; appendList(playlist,0); }
-
-function appendList(items,startIndex){
-  items.forEach((s,i)=>{
-    const idx = startIndex+i;
-    const div = document.createElement('div'); div.className='suggestion'; div.dataset.idx=idx;
-    div.onclick=()=>{ currentIndex=idx; playAt(idx); };
-    div.innerHTML=`<img src="${s.thumbnail}" /><div class="meta"><h4>${s.title}</h4><p>${s.artist} • ${s.year}</p></div>`;
-    listEl.appendChild(div);
-  });
-}
-
-function playAt(idx){
-  if(idx<0 || idx>=playlist.length) return;
-  const item = playlist[idx]; currentIndex=idx;
-  nowInfo.innerText = `${item.title} • ${item.artist} (${item.year})`;
-  highlightCurrent(idx);
-  player.poster=item.thumbnail;
-  if(item.audio_url){ player.src=item.audio_url; setQualities(item.sources); } else{ player.src=""; }
-  player.play().catch(()=>console.log("Autoplay blocked"));
-}
-
-function highlightCurrent(idx){
-  document.querySelectorAll(".suggestion").forEach(el=>el.classList.remove("active"));
-  const activeEl = document.querySelector(`.suggestion[data-idx='${idx}']`);
-  if(activeEl) activeEl.classList.add("active");
-}
-
-function prevItem(){ if(currentIndex>0) playAt(currentIndex-1); }
-function nextItem(){ if(currentIndex+1<playlist.length) playAt(currentIndex+1); }
-function playPause(){ if(player.paused) player.play(); else player.pause(); }
-function setVolume(v){ player.volume=v; }
-function setSpeed(s){ player.playbackRate=s; }
-function setQualities(sources){
-  qualitySelect.innerHTML="";
-  Object.keys(sources).forEach(q=>{ const opt=document.createElement("option"); opt.value=q; opt.innerText=q; qualitySelect.appendChild(opt); });
-  if(qualitySelect.options.length) qualitySelect.selectedIndex=0;
-}
-function changeQuality(q){ if(playlist[currentIndex] && playlist[currentIndex].sources[q]) player.src=playlist[currentIndex].sources[q]; player.play(); }
-function refreshDefaults(){ loadDefaults(1); }
-
-player.addEventListener('ended', ()=>{ nextItem(); });
+function renderList(){listEl.innerHTML="";appendList(playlist,0);}
+function appendList(items,startIndex){for(let i=0;i<items.length;i++){const idx=startIndex+i;const s=items[i];const div=document.createElement('div');div.className='suggestion';div.dataset.idx=idx;div.onclick=()=>{currentIndex=idx;playAt(idx);};
+div.innerHTML=`<img src="${s.thumbnail}"/><div><h4>${s.title}</h4></div>`;listEl.appendChild(div);}}
+function playAt(idx){if(idx<0||idx>=playlist.length)return;const item=playlist[idx];currentIndex=idx;nowInfo.innerText=item.title;highlightCurrent(idx);player.poster=item.thumbnail;player.src=item.video_url;setQualities(item.sources);player.play().catch(()=>console.log("Autoplay blocked"));}
+function highlightCurrent(idx){document.querySelectorAll(".suggestion").forEach(el=>el.classList.remove("active"));const activeEl=document.querySelector(`.suggestion[data-idx='${idx}']`);if(activeEl)activeEl.classList.add("active");}
+function prevItem(){if(currentIndex>0)playAt(currentIndex-1);}
+function nextItem(){if(currentIndex+1<playlist.length)playAt(currentIndex+1);}
+function playPause(){if(player.paused)player.play();else player.pause();}
+function setVolume(v){player.volume=v;}
+function setSpeed(s){player.playbackRate=s;}
+function setQualities(sources){qualitySelect.innerHTML="";Object.keys(sources).forEach(q=>{const opt=document.createElement("option");opt.value=q;opt.innerText=q;qualitySelect.appendChild(opt);});if(qualitySelect.options.length)qualitySelect.selectedIndex=0;}
+function changeQuality(q){if(playlist[currentIndex]&&playlist[currentIndex].sources[q])player.src=playlist[currentIndex].sources[q];player.play();}
+function refreshDefaults(){loadDefaults(1);}
+player.addEventListener('ended',()=>{nextItem();});
 </script>
-
 </body>
 </html>
