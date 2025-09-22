@@ -1,97 +1,74 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<title>Ad-Free Video Player</title>
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<style>
-:root {--bg:#0b0b0d; --card:#111315; --muted:#9aa0a6; --accent:#1db954;}
-body{margin:0;font-family:Arial;background:var(--bg);color:#fff;}
-header{display:flex;justify-content:space-between;padding:16px;}
-input[type=text]{padding:10px 12px;border-radius:6px;border:none;width:60%;}
-button{padding:10px 14px;border-radius:6px;border:none;background:var(--accent);color:#000;cursor:pointer;}
-.container{display:flex;gap:16px;padding:16px;}
-.main{flex:1;}
-.player-card{background:var(--card);padding:14px;border-radius:12px;box-shadow:0 6px 20px rgba(0,0,0,0.6);}
-video{width:100%;border-radius:8px;background:#000;height:400px;object-fit:cover;}
-.controls{display:flex;gap:8px;align-items:center;margin-top:10px;}
-.controls select,input[type=range]{border-radius:6px;padding:6px;border:none;background:#222;color:#fff;}
-.sidebar{width:300px;max-height:80vh;overflow:auto;background:#111;padding:8px;border-radius:12px;}
-.suggestion{display:flex;gap:8px;cursor:pointer;margin-bottom:8px;padding:6px;border-radius:8px;}
-.suggestion img{width:80px;height:60px;object-fit:cover;border-radius:6px;}
-.suggestion.active{outline:2px solid var(--accent);}
-.load-more{width:100%;padding:10px;border-radius:6px;background:#222;color:#fff;border:none;margin-top:6px;}
-</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Ad-Free Music Player</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin:0; background:#111; color:#fff; }
+    #player { width:100%; background:#000; padding:20px; text-align:center; }
+    audio { width:80%; outline:none; }
+    #searchBar { width:70%; padding:10px; margin:10px auto; display:block; border-radius:5px; border:none; }
+    #songs { padding:20px; max-height:400px; overflow-y:auto; }
+    .song { padding:10px; margin:5px 0; background:#222; border-radius:5px; cursor:pointer; }
+    .song:hover { background:#444; }
+    #loadMore { padding:10px 20px; background:#28a745; color:#fff; border:none; border-radius:5px; cursor:pointer; margin:20px auto; display:block; }
+  </style>
 </head>
 <body>
-<header>
-  <h1>Ad-Free Player</h1>
-  <div>
-    <input id="q" type="text" placeholder="Search videos" onkeypress="if(event.key==='Enter') doSearch();">
-    <button onclick="doSearch()">Search</button>
-    <button onclick="refreshDefaults()">Latest</button>
+  <div id="player">
+    <h2 id="nowPlaying">Select a Song</h2>
+    <audio id="audioPlayer" controls autoplay></audio>
   </div>
-</header>
 
-<div class="container">
-  <div class="main">
-    <div class="player-card">
-      <div id="nowInfo">No video loaded</div>
-      <video id="player" controls crossorigin playsinline poster=""></video>
-      <div class="controls">
-        <button onclick="prevItem()">◀ Prev</button>
-        <button onclick="playPause()">Play/Pause</button>
-        <button onclick="nextItem()">Next ▶</button>
-        <label>Volume</label>
-        <input id="vol" type="range" min="0" max="1" step="0.01" value="0.6" onchange="setVolume(this.value)">
-        <label>Speed</label>
-        <select id="speed" onchange="setSpeed(this.value)">
-          <option value="0.5">0.5x</option>
-          <option value="0.75">0.75x</option>
-          <option value="1" selected>1x</option>
-          <option value="1.25">1.25x</option>
-          <option value="1.5">1.5x</option>
-        </select>
-        <label>Quality</label>
-        <select id="quality" onchange="changeQuality(this.value)"></select>
-      </div>
-    </div>
-  </div>
-  <aside class="sidebar" id="sidebar">
-    <h3>Suggestions</h3>
-    <div id="list"></div>
-    <button class="load-more" onclick="loadMore()">Load more</button>
-  </aside>
-</div>
+  <input type="text" id="searchBar" placeholder="Search songs...">
 
-<script>
-let playlist=[],currentIndex=-1,currentPage=1,lastQuery="";
-const player=document.getElementById("player");
-const listEl=document.getElementById("list");
-const nowInfo=document.getElementById("nowInfo");
-const qualitySelect=document.getElementById("quality");
+  <div id="songs"></div>
+  <button id="loadMore">Load More</button>
 
-window.addEventListener('load',()=>{refreshDefaults();setVolume(0.6);});
+  <script>
+    let currentPage = 1;
+    let currentQuery = "";
+    const songsDiv = document.getElementById("songs");
+    const nowPlaying = document.getElementById("nowPlaying");
+    const audioPlayer = document.getElementById("audioPlayer");
 
-async function fetchJSON(path){const r=await fetch(path);return await r.json();}
-async function refreshDefaults(){currentPage=1;lastQuery="";const data=await fetchJSON(`/songs?page=1`);playlist=data;if(data.length){currentIndex=0;playAt(0);}renderList();}
-async function doSearch(){const q=document.getElementById("q").value.trim();lastQuery=q;currentPage=1;
-const data=await fetchJSON(`/songs?q=${encodeURIComponent(q)}&page=1`);playlist=data;if(data.length){currentIndex=0;playAt(0);}renderList();}
-async function loadMore(){currentPage++;const endpoint=lastQuery?`/songs?q=${encodeURIComponent(lastQuery)}&page=${currentPage}`:`/songs?page=${currentPage}`;
-const data=await fetchJSON(endpoint);if(data&&data.length){playlist=playlist.concat(data);appendList(data,playlist.length-data.length);}else{document.querySelector(".load-more").innerText="No more results";document.querySelector(".load-more").disabled=true;}}
+    async function fetchSongs(reset=false) {
+      let url = `/songs?page=${currentPage}`;
+      if (currentQuery) url += `&q=${encodeURIComponent(currentQuery)}`;
 
-function renderList(){listEl.innerHTML="";appendList(playlist,0);}
-function appendList(items,startIndex){for(let i=0;i<items.length;i++){const idx=startIndex+i;const s=items[i];const div=document.createElement('div');div.className='suggestion';div.dataset.idx=idx;div.onclick=()=>{currentIndex=idx;playAt(idx);};div.innerHTML=`<img src="${s.thumbnail}"/><div><h4>${s.title}</h4></div>`;listEl.appendChild(div);}}
-function playAt(idx){if(idx<0||idx>=playlist.length)return;const item=playlist[idx];currentIndex=idx;nowInfo.innerText=item.title;highlightCurrent(idx);player.poster=item.thumbnail;player.src=item.video_url;setQualities(item.sources);player.play().catch(()=>console.log("Autoplay blocked"));}
-function highlightCurrent(idx){document.querySelectorAll(".suggestion").forEach(el=>el.classList.remove("active"));const activeEl=document.querySelector(`.suggestion[data-idx='${idx}']`);if(activeEl)activeEl.classList.add("active");}
-function prevItem(){if(currentIndex>0)playAt(currentIndex-1);}
-function nextItem(){if(currentIndex+1<playlist.length)playAt(currentIndex+1);}
-function playPause(){if(player.paused)player.play();else player.pause();}
-function setVolume(v){player.volume=v;}
-function setSpeed(s){player.playbackRate=s;}
-function setQualities(sources){qualitySelect.innerHTML="";Object.keys(sources).forEach(q=>{const opt=document.createElement("option");opt.value=q;opt.innerText=q;qualitySelect.appendChild(opt);});if(qualitySelect.options.length)qualitySelect.selectedIndex=0;}
-function changeQuality(q){if(playlist[currentIndex]&&playlist[currentIndex].sources[q])player.src=playlist[currentIndex].sources[q];player.play();}
-player.addEventListener('ended',()=>{nextItem();});
-</script>
+      const res = await fetch(url);
+      const data = await res.json();
+
+      if (reset) songsDiv.innerHTML = "";
+
+      data.forEach(song => {
+        const div = document.createElement("div");
+        div.className = "song";
+        div.textContent = song.title;
+        div.onclick = () => {
+          audioPlayer.src = song.url;
+          nowPlaying.textContent = "Now Playing: " + song.title;
+          audioPlayer.play();
+        };
+        songsDiv.appendChild(div);
+      });
+    }
+
+    document.getElementById("loadMore").onclick = () => {
+      currentPage++;
+      fetchSongs();
+    };
+
+    document.getElementById("searchBar").addEventListener("keyup", e => {
+      if (e.key === "Enter") {
+        currentQuery = e.target.value;
+        currentPage = 1;
+        fetchSongs(true);
+      }
+    });
+
+    fetchSongs(true);
+  </script>
 </body>
 </html>
