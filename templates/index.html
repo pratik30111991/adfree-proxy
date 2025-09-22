@@ -8,28 +8,125 @@
 :root{
   --bg:#0b0b0d; --card:#111315; --muted:#9aa0a6; --accent:#1db954; --accent-2:#2aa7ff;
 }
-body{margin:0;font-family:Inter,Arial,Helvetica,sans-serif;background:linear-gradient(180deg,#070709,#0f1213);color:#e6eef3}
-header{padding:20px 24px;display:flex;align-items:center;justify-content:space-between}
+body{
+  margin:0;
+  font-family:Inter,Arial,Helvetica,sans-serif;
+  background:linear-gradient(180deg,#070709,#0f1213);
+  color:#e6eef3;
+}
+header{
+  padding:20px 24px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+}
 h1{margin:0;font-size:20px;letter-spacing:0.4px}
-.searchbar{display:flex;gap:10px;align-items:center}
-input[type=text]{padding:10px 12px;width:420px;border-radius:8px;border:1px solid #222;background:#0c0e10;color:#fff;outline:none}
-button{background:var(--accent);border:none;padding:10px 12px;border-radius:8px;color:#04110a;cursor:pointer;font-weight:600}
-.container{display:flex;gap:18px;padding:18px}
+.searchbar{
+  display:flex;
+  gap:10px;
+  align-items:center;
+}
+input[type=text]{
+  padding:10px 12px;
+  width:420px;
+  border-radius:8px;
+  border:1px solid #222;
+  background:#0c0e10;
+  color:#fff;
+  outline:none;
+}
+button{
+  background:var(--accent);
+  border:none;
+  padding:10px 12px;
+  border-radius:8px;
+  color:#04110a;
+  cursor:pointer;
+  font-weight:600;
+}
+.container{
+  display:flex;
+  gap:18px;
+  padding:18px;
+}
 .main{flex:1;min-width:320px}
-.player-card{background:var(--card);padding:14px;border-radius:12px;box-shadow:0 6px 20px rgba(0,0,0,0.6)}
-video{width:100%;border-radius:8px;background:#000;height:360px}
-.controls{display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap}
-.controls select,input[type=range]{background:#0b0d0f;border-radius:8px;padding:6px;border:1px solid #222;color:#fff}
-.controls button.small{padding:8px 10px;background:#222;border-radius:8px;color:#fff;border:1px solid #222}
-.sidebar{width:320px;max-height:70vh;overflow:auto;padding:8px;background:rgba(10,12,13,0.6);border-radius:12px}
-.suggestion{display:flex;gap:10px;padding:8px;border-radius:10px;align-items:center;cursor:pointer;margin-bottom:8px;background:transparent}
-.suggestion img{width:72px;height:54px;object-fit:cover;border-radius:6px}
+.player-card{
+  background:var(--card);
+  padding:14px;
+  border-radius:12px;
+  box-shadow:0 6px 20px rgba(0,0,0,0.6);
+}
+video{
+  width:100%;
+  border-radius:8px;
+  background:linear-gradient(180deg,#1e1e1e,#2e2e2e);
+  height:360px;
+  object-fit:cover;
+}
+.controls{
+  display:flex;
+  gap:8px;
+  align-items:center;
+  margin-top:10px;
+  flex-wrap:wrap;
+}
+.controls select,input[type=range]{
+  background:#0b0d0f;
+  border-radius:8px;
+  padding:6px;
+  border:1px solid #222;
+  color:#fff;
+}
+.controls button.small{
+  padding:8px 10px;
+  background:#222;
+  border-radius:8px;
+  color:#fff;
+  border:1px solid #222;
+}
+.sidebar{
+  width:320px;
+  max-height:70vh;
+  overflow:auto;
+  padding:8px;
+  background:rgba(10,12,13,0.6);
+  border-radius:12px;
+}
+.suggestion{
+  display:flex;
+  gap:10px;
+  padding:8px;
+  border-radius:10px;
+  align-items:center;
+  cursor:pointer;
+  margin-bottom:8px;
+  background:transparent;
+}
+.suggestion img{
+  width:72px;
+  height:54px;
+  object-fit:cover;
+  border-radius:6px;
+}
 .suggestion .meta{flex:1}
 .suggestion .meta h4{margin:0;font-size:14px}
 .suggestion .meta p{margin:4px 0 0 0;color:var(--muted);font-size:12px}
-.suggestion:hover{background:rgba(255,255,255,0.02)}
-.suggestion.active{outline:2px solid var(--accent);background:linear-gradient(90deg, rgba(29,185,84,0.06), rgba(42,167,255,0.02))}
-.load-more{width:100%;padding:10px;border-radius:8px;border:none;margin-top:6px;background:#202425;color:#cfe}
+.suggestion:hover{
+  background:rgba(255,255,255,0.02)
+}
+.suggestion.active{
+  outline:2px solid var(--accent);
+  background:linear-gradient(90deg, rgba(29,185,84,0.06), rgba(42,167,255,0.02))
+}
+.load-more{
+  width:100%;
+  padding:10px;
+  border-radius:8px;
+  border:none;
+  margin-top:6px;
+  background:#202425;
+  color:#cfe;
+}
 .muted{color:var(--muted);font-size:13px}
 @media(max-width:900px){
   .container{flex-direction:column;padding:12px}
@@ -42,7 +139,8 @@ video{width:100%;border-radius:8px;background:#000;height:360px}
 <header>
   <h1>Ad-Free Player — Archive.org Library</h1>
   <div class="searchbar">
-    <input id="q" type="text" placeholder="Search title, artist, year (e.g. 'classic 1995')" />
+    <input id="q" type="text" placeholder="Search title, artist, year (e.g. 'classic 1995')" 
+           onkeypress="if(event.key==='Enter'){doSearch();}" />
     <button onclick="doSearch()">Search</button>
     <button style="background:var(--accent-2)" onclick="refreshDefaults()">Latest</button>
   </div>
@@ -52,7 +150,7 @@ video{width:100%;border-radius:8px;background:#000;height:360px}
   <div class="main">
     <div class="player-card">
       <div id="nowInfo" class="muted">No track loaded</div>
-      <video id="player" controls crossorigin playsinline></video>
+      <video id="player" controls crossorigin playsinline poster=""></video>
 
       <div class="controls">
         <button class="small" onclick="prevItem()">◀ Prev</button>
@@ -122,7 +220,7 @@ async function doSearch(){
   currentPage = 1;
   const data = await fetchJSON(`/search?q=${encodeURIComponent(q)}&page=1`);
   playlist = data; renderList();
-  if(playlist.length){ currentIndex = 0; playAt(0); } else { nowInfo.innerText = "No results"; player.src=""; }
+  if(playlist.length){ currentIndex = 0; playAt(0); } else { nowInfo.innerText = "No results"; player.src=""; player.poster=""; }
 }
 
 async function loadMore(){
@@ -158,7 +256,7 @@ function playAt(idx){
   currentIndex = idx;
   nowInfo.innerText = `${item.title} • ${item.artist} (${item.year})`;
   highlightCurrent(idx);
-  // Use audio/video depending on availability
+  player.poster = item.thumbnail; // show thumbnail
   if(item.audio_url) { player.src = item.audio_url; setQualities(item.sources); } 
   else if(item.video_url){ player.src = item.video_url; setQualities(item.sources); } 
   else { player.src=""; }
