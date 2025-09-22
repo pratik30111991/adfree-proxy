@@ -5,33 +5,35 @@ from bs4 import BeautifulSoup
 
 app = Flask(__name__)
 
-# Popular categories hardcoded (working)
-CATEGORIES = [
-    {"title": "A To Z Bollywood Mp3 Songs", "url": "https://wapking.sbs/categorylist/44/a_to_z_bollywood_mp3_songs/default/1"},
-    {"title": "Hindi Mp3 Songs", "url": "https://wapking.sbs/categorylist/4960/hindi_mp3_songs/default/1"},
-    {"title": "Punjabi Mp3 Song", "url": "https://wapking.sbs/categorylist/4554/punjabi_mp3_song/default/1"},
-    {"title": "Special Mp3 Songs", "url": "https://wapking.sbs/filelist/3376/special_mp3_songs/new2old/1"}
-]
+BASE_URL = "https://wapking.sbs"
 
-@app.route('/search')
-def search():
-    artist = request.args.get('q', '').lower()
+def search_songs(query):
     results = []
+    search_url = f"{BASE_URL}/search.php?q={query.replace(' ', '+')}"
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+    }
+    try:
+        r = requests.get(search_url, headers=headers, timeout=10)
+        soup = BeautifulSoup(r.text, 'html.parser')
+        items = soup.select("div.list div.item a")  # adjust according to site
+        for item in items:
+            title = item.text.strip()
+            url = item['href']
+            if not url.startswith("http"):
+                url = BASE_URL + url
+            results.append({"title": title, "url": url})
+    except Exception as e:
+        print("Error:", e)
+    return results
 
-    for cat in CATEGORIES:
-        try:
-            r = requests.get(cat["url"], timeout=10)
-            soup = BeautifulSoup(r.text, "html.parser")
-            songs = soup.select("a.song")  # Correct selector depends on site structure
-            for s in songs:
-                title = s.text.strip()
-                link = s.get("href")
-                if artist in title.lower():
-                    results.append({"title": title, "url": link})
-        except Exception as e:
-            print(f"Error fetching {cat['url']}: {e}")
+@app.route("/search")
+def search():
+    q = request.args.get("q", "")
+    if not q:
+        return jsonify([])
+    data = search_songs(q)
+    return jsonify(data)
 
-    return jsonify(results)
-
-if __name__ == '__main__':
-    app.run(host="0.0.0.0", port=10000)
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5000)
