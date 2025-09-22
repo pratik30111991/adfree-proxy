@@ -9,7 +9,7 @@ def fetch_archive_songs(query="", rows=15):
     query_str = f'title:("{query}")' if query else 'mediatype:(audio video)'
     params = {
         'q': query_str,
-        'fl[]': ['identifier', 'title', 'creator', 'date', 'mediatype', 'description', 'image'],
+        'fl[]': ['identifier', 'title', 'creator', 'date', 'mediatype'],
         'sort[]': 'date desc',
         'rows': rows,
         'page': 1,
@@ -20,15 +20,30 @@ def fetch_archive_songs(query="", rows=15):
         return []
     docs = r.json().get('response', {}).get('docs', [])
     songs = []
+
     for d in docs:
         identifier = d.get('identifier')
         mediatype = d.get('mediatype','audio')
-        if mediatype == "audio":
-            audio_url = f"https://archive.org/download/{identifier}/{identifier}_64kb.mp3"
-            video_url = ""
-        else:
-            video_url = f"https://archive.org/download/{identifier}/{identifier}.mp4"
-            audio_url = f"https://archive.org/download/{identifier}/{identifier}_64kb.mp3"
+
+        # ✅ Metadata fetch karo
+        meta_url = f"https://archive.org/metadata/{identifier}"
+        meta_res = requests.get(meta_url).json()
+        files = meta_res.get("files", [])
+
+        audio_url, video_url, qualities = "", "", []
+
+        for f in files:
+            name = f.get("name", "")
+            if name.endswith(".mp3") and not audio_url:
+                audio_url = f"https://archive.org/download/{identifier}/{name}"
+                qualities.append("mp3")
+            if name.endswith(".mp4") and not video_url:
+                video_url = f"https://archive.org/download/{identifier}/{name}"
+                qualities.append("mp4")
+
+        if not audio_url and not video_url:
+            continue  # skip if nothing playable
+
         thumbnail = f"https://archive.org/services/img/{identifier}"
         songs.append({
             "title": d.get('title', 'Unknown'),
@@ -38,7 +53,7 @@ def fetch_archive_songs(query="", rows=15):
             "audio_url": audio_url,
             "video_url": video_url,
             "thumbnail": thumbnail,
-            "qualities": ["64kb", "128kb"] if mediatype=="audio" else ["360p", "720p"]
+            "qualities": qualities or ["default"]
         })
     return songs
 
