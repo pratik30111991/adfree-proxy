@@ -1,82 +1,39 @@
 from flask import Flask, render_template, request, jsonify
 import requests
+from bs4 import BeautifulSoup
 
 app = Flask(__name__)
 
-ARCHIVE_API = "https://archive.org/advancedsearch.php"
-METADATA_API = "https://archive.org/metadata/{}"
+# Demo streaming site (replace with a legal streaming URL if needed)
+STREAM_SITE = "https://wapking.sbs/search/{}"
 
-def fetch_archive_songs(query="", rows=50, page=1):
-    """Fetch songs from archive.org (audio/video)"""
-    if query:
-        q = f'(title:("{query}") OR creator:("{query}") OR subject:("{query}"))'
-    else:
-        q = 'mediatype:audio OR mediatype:movies'
-
-    params = {
-        "q": q,
-        "fl[]": ["identifier", "title", "creator", "date", "mediatype", "description"],
-        "sort[]": "publicdate desc",
-        "rows": rows,
-        "page": page,
-        "output": "json"
-    }
-
-    try:
-        resp = requests.get(ARCHIVE_API, params=params, timeout=12)
-        resp.raise_for_status()
-    except Exception:
-        return []
-
-    docs = resp.json().get("response", {}).get("docs", [])
+def fetch_stream_songs(query="", page=1):
+    """Fetch songs/videos from a streaming site via scraping"""
+    if not query:
+        query = "latest"
+    url = STREAM_SITE.format(query.replace(" ", "+"))
     results = []
 
-    for d in docs:
-        identifier = d.get("identifier")
-        if not identifier:
-            continue
+    try:
+        resp = requests.get(url, timeout=12)
+        resp.raise_for_status()
+        soup = BeautifulSoup(resp.text, "html.parser")
 
-        try:
-            meta = requests.get(METADATA_API.format(identifier), timeout=12).json()
-        except Exception:
-            continue
-
-        files = meta.get("files", [])
-        audio_url, video_url, thumbnail = "", "", ""
-        audio_map, video_map = {}, {}
-
-        for f in files:
-            name = f.get("name", "")
-            fmt = f.get("format", "").lower()
-            size = f.get("size", 0)
-            if not name or size < 1000000:  # Skip tiny files
-                continue
-            url = f"https://archive.org/download/{identifier}/{name}"
-
-            if "mp3" in fmt or "ogg" in fmt:
-                audio_url = url
-                audio_map[f.get("bitrate") or "mp3"] = url
-            elif "mp4" in fmt or "mpeg4" in fmt or "webm" in fmt or "h.264" in fmt:
-                video_url = url
-                video_map[str(f.get("height") or "mp4")] = url
-            if not thumbnail and ("jpg" in fmt or "png" in fmt):
-                thumbnail = url
-
-        if not thumbnail:
-            thumbnail = f"https://archive.org/services/img/{identifier}"
-
-        results.append({
-            "id": identifier,
-            "title": d.get("title", "Unknown"),
-            "artist": d.get("creator", "Unknown"),
-            "year": d.get("date", "Unknown"),
-            "description": d.get("description", "") or "",
-            "category": d.get("mediatype") or ("audio" if audio_url else "video"),
-            "audio_url": audio_url or "",
-            "video_url": video_url or "",
-            "thumbnail": thumbnail,
-            "sources": {**audio_map, **video_map}
-        })
+        # Parse songs/videos
+        items = soup.select(".song-box")  # adjust selector based on site structure
+        for item in items:
+            title_tag = item.select_one(".title")
+            thumb_tag = item.select_one("img")
+            link_tag = item.select_one("a")
+            if title_tag and link_tag:
+                results.append({
+                    "title": title_tag.text.strip(),
+                    "video_url": link_tag["href"],
+                    "thumbnail": thumb_tag["src"] if thumb_tag else "",
+                    "sources": { "default": link_tag["href"] }
+                })
+    except Exception as e:
+        print("Error fetching songs:", e)
 
     return results
 
@@ -84,7 +41,7 @@ def fetch_archive_songs(query="", rows=50, page=1):
 def songs():
     q = request.args.get("q", "")
     page = int(request.args.get("page", 1))
-    return jsonify(fetch_archive_songs(query=q, rows=50, page=page))
+    return jsonify(fetch_stream_songs(query=q, page=page))
 
 @app.route("/")
 def index():
