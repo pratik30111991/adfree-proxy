@@ -71,23 +71,17 @@ const listEl=document.getElementById("list");
 const nowInfo=document.getElementById("nowInfo");
 const qualitySelect=document.getElementById("quality");
 
-window.addEventListener('load',()=>{loadDefaults();setVolume(0.6);});
+window.addEventListener('load',()=>{refreshDefaults();setVolume(0.6);});
 
 async function fetchJSON(path){const r=await fetch(path);return await r.json();}
-async function loadDefaults(page=1){currentPage=page;lastQuery="";const data=await fetchJSON(`/default_videos?page=${page}`);
-if(page===1){playlist=data;}else{playlist=playlist.concat(data);}
-renderList();if(currentIndex===-1&&playlist.length){currentIndex=0;playAt(currentIndex);}}
-
+async function refreshDefaults(){currentPage=1;lastQuery="";const data=await fetchJSON(`/songs?page=1`);playlist=data;if(data.length){currentIndex=0;playAt(0);}renderList();}
 async function doSearch(){const q=document.getElementById("q").value.trim();lastQuery=q;currentPage=1;
-const data=await fetchJSON(`/search?q=${encodeURIComponent(q)}&page=1`);playlist=data;renderList();
-if(playlist.length){currentIndex=0;playAt(0);}else{nowInfo.innerText="No results";player.src="";player.poster="";}}
-
-async function loadMore(){currentPage++;const endpoint=lastQuery?`/search?q=${encodeURIComponent(lastQuery)}&page=${currentPage}`:`/default_videos?page=${currentPage}`;
+const data=await fetchJSON(`/songs?q=${encodeURIComponent(q)}&page=1`);playlist=data;if(data.length){currentIndex=0;playAt(0);}renderList();}
+async function loadMore(){currentPage++;const endpoint=lastQuery?`/songs?q=${encodeURIComponent(lastQuery)}&page=${currentPage}`:`/songs?page=${currentPage}`;
 const data=await fetchJSON(endpoint);if(data&&data.length){playlist=playlist.concat(data);appendList(data,playlist.length-data.length);}else{document.querySelector(".load-more").innerText="No more results";document.querySelector(".load-more").disabled=true;}}
 
 function renderList(){listEl.innerHTML="";appendList(playlist,0);}
-function appendList(items,startIndex){for(let i=0;i<items.length;i++){const idx=startIndex+i;const s=items[i];const div=document.createElement('div');div.className='suggestion';div.dataset.idx=idx;div.onclick=()=>{currentIndex=idx;playAt(idx);};
-div.innerHTML=`<img src="${s.thumbnail}"/><div><h4>${s.title}</h4></div>`;listEl.appendChild(div);}}
+function appendList(items,startIndex){for(let i=0;i<items.length;i++){const idx=startIndex+i;const s=items[i];const div=document.createElement('div');div.className='suggestion';div.dataset.idx=idx;div.onclick=()=>{currentIndex=idx;playAt(idx);};div.innerHTML=`<img src="${s.thumbnail}"/><div><h4>${s.title}</h4></div>`;listEl.appendChild(div);}}
 function playAt(idx){if(idx<0||idx>=playlist.length)return;const item=playlist[idx];currentIndex=idx;nowInfo.innerText=item.title;highlightCurrent(idx);player.poster=item.thumbnail;player.src=item.video_url;setQualities(item.sources);player.play().catch(()=>console.log("Autoplay blocked"));}
 function highlightCurrent(idx){document.querySelectorAll(".suggestion").forEach(el=>el.classList.remove("active"));const activeEl=document.querySelector(`.suggestion[data-idx='${idx}']`);if(activeEl)activeEl.classList.add("active");}
 function prevItem(){if(currentIndex>0)playAt(currentIndex-1);}
@@ -97,7 +91,6 @@ function setVolume(v){player.volume=v;}
 function setSpeed(s){player.playbackRate=s;}
 function setQualities(sources){qualitySelect.innerHTML="";Object.keys(sources).forEach(q=>{const opt=document.createElement("option");opt.value=q;opt.innerText=q;qualitySelect.appendChild(opt);});if(qualitySelect.options.length)qualitySelect.selectedIndex=0;}
 function changeQuality(q){if(playlist[currentIndex]&&playlist[currentIndex].sources[q])player.src=playlist[currentIndex].sources[q];player.play();}
-function refreshDefaults(){loadDefaults(1);}
 player.addEventListener('ended',()=>{nextItem();});
 </script>
 </body>
