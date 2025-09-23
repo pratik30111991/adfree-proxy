@@ -1,75 +1,50 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <meta charset="utf-8" />
-    <title>AdFree Player — Search</title>
-    <style>
-        body { font-family: Arial, sans-serif; max-width: 900px; margin: 30px auto; }
-        input[type=text]{width:70%; padding:8px; font-size:16px;}
-        button{padding:8px 12px; font-size:16px;}
-        .result{border-bottom:1px solid #ddd; padding:10px 0;}
-        .title{font-weight:600;}
-        .small{color:#666; font-size:13px;}
-    </style>
+<meta charset="UTF-8">
+<title>Ad-Free Music Player</title>
+<style>
+body { font-family: Arial; background: #111; color: #fff; }
+#search { width: 80%; padding: 10px; margin: 20px auto; display:block; }
+#results { margin: 20px; }
+.song { padding: 10px; border-bottom: 1px solid #444; cursor:pointer; }
+.audio-player { width: 100%; margin-top: 20px; }
+</style>
 </head>
 <body>
-    <h2>AdFree Player — Search (UI)</h2>
-    <input type="text" id="q" placeholder="Search e.g. arijit singh" />
-    <button onclick="doSearch()">Search</button>
 
-    <div id="results" style="margin-top:20px"></div>
-
-    <div id="playerDiv" style="margin-top:20px; display:none;">
-        <h3>Player</h3>
-        <audio id="player" controls style="width:100%"></audio>
-    </div>
+<input type="text" id="search" placeholder="Search song / artist..." />
+<div id="results"></div>
+<audio controls class="audio-player" id="player"></audio>
 
 <script>
-async function doSearch(){
-    const q = document.getElementById('q').value.trim();
-    if(!q) return alert('enter query');
-    const res = await fetch(`/search?q=${encodeURIComponent(q)}`);
-    const arr = await res.json();
-    const R = document.getElementById('results');
-    R.innerHTML = '';
-    if(!arr || arr.length === 0){
-        R.innerHTML = '<div>No results</div>';
-        return;
-    }
-    arr.forEach((it, idx) => {
-        const d = document.createElement('div');
-        d.className = 'result';
-        const title = document.createElement('div');
-        title.className = 'title';
-        title.innerHTML = `${idx+1}. ${escapeHtml(it.title)}`;
-        const link = document.createElement('div');
-        link.className='small';
-        if(it.audio_links && it.audio_links.length>0){
-            link.innerHTML = `Playable audio found: <a href="#" onclick="play('${it.audio_links[0]}');return false;">Play</a> • <a href="${it.audio_links[0]}" target="_blank">Open</a>`;
-        } else {
-            link.innerHTML = `No direct mp3 found. <a href="${it.page_url}" target="_blank">Open page</a>`;
-        }
-        const page = document.createElement('div');
-        page.className='small';
-        page.innerHTML = `<a href="${it.page_url}" target="_blank">${it.page_url}</a>`;
-        d.appendChild(title);
-        d.appendChild(link);
-        d.appendChild(page);
-        R.appendChild(d);
+const searchBox = document.getElementById('search');
+const resultsDiv = document.getElementById('results');
+const player = document.getElementById('player');
+
+searchBox.addEventListener('keypress', async (e) => {
+  if(e.key === 'Enter') {
+    const query = searchBox.value.trim();
+    resultsDiv.innerHTML = "Loading...";
+    const res = await fetch(`https://adfree-proxy.onrender.com/search?q=${encodeURIComponent(query)}`);
+    const data = await res.json();
+    
+    resultsDiv.innerHTML = "";
+    data.forEach(song => {
+      if(song.audio_links.length > 0) {
+        const div = document.createElement('div');
+        div.className = "song";
+        div.innerHTML = `<strong>${song.title}</strong> - ${song.artist || "Unknown"}<br/><small>${song.source_url}</small>`;
+        div.onclick = () => {
+          player.src = song.audio_links[0];
+          player.play();
+        };
+        resultsDiv.appendChild(div);
+      }
     });
-}
-
-function play(url){
-    const pdiv = document.getElementById('playerDiv');
-    const player = document.getElementById('player');
-    player.src = url;
-    pdiv.style.display = 'block';
-    player.play();
-}
-
-function escapeHtml(s){
-    return (s||'').replace(/[&<>"']/g, function(m){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]; });
-}
+    if(resultsDiv.innerHTML === "") resultsDiv.innerHTML = "No songs found!";
+  }
+});
 </script>
 </body>
 </html>
