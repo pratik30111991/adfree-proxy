@@ -8,19 +8,23 @@ BASE_URL = "https://wapking.sbs"
 
 def search_songs(query):
     results = []
-    search_url = f"{BASE_URL}/search.php?q={query.replace(' ', '+')}"
+    # Wapking search URL
+    search_url = f"{BASE_URL}/search?q={query.replace(' ', '+')}"
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
     }
     try:
         r = requests.get(search_url, headers=headers, timeout=10)
-        soup = BeautifulSoup(r.text, 'html.parser')
-        items = soup.select("div.list div.item a")  # adjust if site structure changes
+        soup = BeautifulSoup(r.text, "html.parser")
+
+        # Pick results from Google Custom Search overlay
+        items = soup.select(".gsc-webResult .gs-title a")
+
         for item in items:
-            title = item.text.strip()
-            url = item['href']
-            if not url.startswith("http"):
-                url = BASE_URL + url
+            title = item.get_text(strip=True)
+            url = item.get("href")
+            if not url:
+                continue
             results.append({"title": title, "url": url})
     except Exception as e:
         print("Error:", e)
