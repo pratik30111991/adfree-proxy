@@ -1,57 +1,52 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>Ad-Free Music Player</title>
-    <style>
-        body { font-family: Arial; background:#f0f0f0; padding:20px; }
-        #player { width:100%; height:360px; margin-bottom:20px; }
-        #searchBar { width: 80%; padding: 10px; font-size: 16px; }
-        #searchBtn { padding: 10px 20px; font-size: 16px; }
-        .song { display:flex; align-items:center; margin-bottom:10px; cursor:pointer; }
-        .song img { width:80px; height:60px; margin-right:10px; }
-    </style>
+  <meta charset="UTF-8">
+  <title>YouTube Search Proxy</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    input { padding: 8px; width: 300px; }
+    button { padding: 8px 12px; }
+    .result { margin-top: 15px; }
+    .card { border: 1px solid #ddd; padding: 10px; margin-bottom: 10px; display: flex; gap: 10px; }
+    img { width: 120px; height: auto; }
+  </style>
 </head>
 <body>
-    <h1>Ad-Free Music Player</h1>
-    <input type="text" id="searchBar" placeholder="Search song...">
-    <button id="searchBtn">Search</button>
-    <div id="results"></div>
-    <iframe id="player" src="" frameborder="0" allow="autoplay; encrypted-media" allowfullscreen></iframe>
+  <h2>🎵 YouTube Search Proxy</h2>
+  <input type="text" id="query" placeholder="Type something...">
+  <button onclick="search()">Search</button>
+  
+  <div id="results"></div>
 
-<script>
-const searchBtn = document.getElementById('searchBtn');
-const searchBar = document.getElementById('searchBar');
-const resultsDiv = document.getElementById('results');
-const player = document.getElementById('player');
+  <script>
+    async function search() {
+      const q = document.getElementById("query").value;
+      if (!q) return alert("Please enter a query");
+      
+      const res = await fetch(`/search?q=${encodeURIComponent(q)}`);
+      const data = await res.json();
 
-searchBtn.addEventListener('click', () => {
-    const query = searchBar.value.trim();
-    if(!query) return;
-    fetch(`/search?q=${encodeURIComponent(query)}`)
-        .then(res => res.json())
-        .then(data => {
-            resultsDiv.innerHTML = '';
-            if(data.length === 0){
-                resultsDiv.innerHTML = '<p>No results found.</p>';
-                player.src = '';
-                return;
-            }
-            data.forEach(video => {
-                const div = document.createElement('div');
-                div.className = 'song';
-                div.innerHTML = `<img src="${video.thumbnail}"><span>${video.title}</span>`;
-                div.addEventListener('click', () => {
-                    player.src = `https://www.youtube.com/embed/${video.videoId}?autoplay=1`;
-                });
-                resultsDiv.appendChild(div);
-            });
-        })
-        .catch(err => {
-            resultsDiv.innerHTML = '<p>Error fetching results.</p>';
-            console.error(err);
+      const resultsDiv = document.getElementById("results");
+      resultsDiv.innerHTML = "";
+
+      if (data.results && data.results.length > 0) {
+        data.results.forEach(item => {
+          const div = document.createElement("div");
+          div.className = "card";
+          div.innerHTML = `
+            <img src="${item.thumbnail}" alt="">
+            <div>
+              <b>${item.title}</b><br>
+              <a href="${item.url}" target="_blank">${item.url}</a>
+            </div>
+          `;
+          resultsDiv.appendChild(div);
         });
-});
-</script>
+      } else {
+        resultsDiv.innerHTML = "<p>No results found.</p>";
+      }
+    }
+  </script>
 </body>
 </html>
