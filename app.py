@@ -1,25 +1,34 @@
 from flask import Flask, render_template, request, jsonify
-import requests
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.by import By
 from bs4 import BeautifulSoup
+import time
 
 app = Flask(__name__)
 
 def youtube_search(query, max_results=10):
-    query = query.replace(' ', '+')
-    url = f"https://www.youtube.com/results?search_query={query}"
-    headers = {
-        "User-Agent": "Mozilla/5.0"
-    }
-    response = requests.get(url, headers=headers)
-    soup = BeautifulSoup(response.text, "html.parser")
-    results = []
+    options = Options()
+    options.add_argument("--headless")
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-dev-shm-usage")
+    options.add_argument("--disable-gpu")
+    options.add_argument("--window-size=1920,1080")
 
+    driver = webdriver.Chrome(options=options)
+    search_url = f"https://www.youtube.com/results?search_query={query.replace(' ', '+')}"
+    driver.get(search_url)
+    time.sleep(3)  # wait for page to load dynamic content
+
+    soup = BeautifulSoup(driver.page_source, "html.parser")
+    driver.quit()
+
+    results = []
     for video in soup.find_all('a', href=True):
         href = video['href']
         if '/watch?v=' in href:
             video_id = href.split('v=')[1].split('&')[0]
-            # fallback if title attribute is missing
-            title = video.get('title') or video.text.strip()
+            title = video.get('title') or video.get('aria-label') or video.text.strip()
             if title:
                 thumbnail = f"https://img.youtube.com/vi/{video_id}/hqdefault.jpg"
                 results.append({
