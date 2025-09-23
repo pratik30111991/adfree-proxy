@@ -1,67 +1,74 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-  <meta charset="UTF-8">
-  <title>Ad-Free Music Player</title>
-  <style>
-    body { font-family: Arial, sans-serif; background:#111; color:#fff; text-align:center; }
-    #player { margin:20px auto; }
-    #results { margin-top:30px; display:flex; flex-direction:column; align-items:center; }
-    .song { margin:10px; padding:10px; border:1px solid #444; width:80%; cursor:pointer; }
-    .song:hover { background:#222; }
-    audio { width:80%; margin-top:15px; }
-    input[type=text]{ padding:10px; width:300px; }
-    button { padding:10px; margin-left:5px; }
-  </style>
+    <meta charset="utf-8" />
+    <title>AdFree Player — Search</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 900px; margin: 30px auto; }
+        input[type=text]{width:70%; padding:8px; font-size:16px;}
+        button{padding:8px 12px; font-size:16px;}
+        .result{border-bottom:1px solid #ddd; padding:10px 0;}
+        .title{font-weight:600;}
+        .small{color:#666; font-size:13px;}
+    </style>
 </head>
 <body>
-  <h1>🎵 Ad-Free Music Player</h1>
-  <div>
-    <input type="text" id="query" placeholder="Search songs...">
-    <button onclick="searchSongs()">Search</button>
-  </div>
+    <h2>AdFree Player — Search (UI)</h2>
+    <input type="text" id="q" placeholder="Search e.g. arijit singh" />
+    <button onclick="doSearch()">Search</button>
 
-  <div id="player">
-    <audio id="audioPlayer" controls autoplay></audio>
-  </div>
+    <div id="results" style="margin-top:20px"></div>
 
-  <h2>Suggestions</h2>
-  <div id="results"></div>
+    <div id="playerDiv" style="margin-top:20px; display:none;">
+        <h3>Player</h3>
+        <audio id="player" controls style="width:100%"></audio>
+    </div>
 
 <script>
-async function searchSongs() {
-  let query = document.getElementById("query").value;
-  if(!query) return;
-
-  let res = await fetch(`/search?q=${encodeURIComponent(query)}`);
-  let data = await res.json();
-
-  let resultsDiv = document.getElementById("results");
-  resultsDiv.innerHTML = "";
-
-  if(data.error || !data.items) {
-    resultsDiv.innerHTML = "<p>No results found.</p>";
-    return;
-  }
-
-  data.items.forEach((song, index) => {
-    let div = document.createElement("div");
-    div.className = "song";
-    div.innerHTML = `
-      <b>${song.title}</b><br>
-      <small>${song.channel}</small>
-    `;
-    div.onclick = () => playSong(song.url);
-    resultsDiv.appendChild(div);
-
-    if(index === 0) playSong(song.url); // First song auto play
-  });
+async function doSearch(){
+    const q = document.getElementById('q').value.trim();
+    if(!q) return alert('enter query');
+    const res = await fetch(`/search?q=${encodeURIComponent(q)}`);
+    const arr = await res.json();
+    const R = document.getElementById('results');
+    R.innerHTML = '';
+    if(!arr || arr.length === 0){
+        R.innerHTML = '<div>No results</div>';
+        return;
+    }
+    arr.forEach((it, idx) => {
+        const d = document.createElement('div');
+        d.className = 'result';
+        const title = document.createElement('div');
+        title.className = 'title';
+        title.innerHTML = `${idx+1}. ${escapeHtml(it.title)}`;
+        const link = document.createElement('div');
+        link.className='small';
+        if(it.audio_links && it.audio_links.length>0){
+            link.innerHTML = `Playable audio found: <a href="#" onclick="play('${it.audio_links[0]}');return false;">Play</a> • <a href="${it.audio_links[0]}" target="_blank">Open</a>`;
+        } else {
+            link.innerHTML = `No direct mp3 found. <a href="${it.page_url}" target="_blank">Open page</a>`;
+        }
+        const page = document.createElement('div');
+        page.className='small';
+        page.innerHTML = `<a href="${it.page_url}" target="_blank">${it.page_url}</a>`;
+        d.appendChild(title);
+        d.appendChild(link);
+        d.appendChild(page);
+        R.appendChild(d);
+    });
 }
 
-function playSong(url) {
-  let player = document.getElementById("audioPlayer");
-  player.src = url;
-  player.play();
+function play(url){
+    const pdiv = document.getElementById('playerDiv');
+    const player = document.getElementById('player');
+    player.src = url;
+    pdiv.style.display = 'block';
+    player.play();
+}
+
+function escapeHtml(s){
+    return (s||'').replace(/[&<>"']/g, function(m){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]; });
 }
 </script>
 </body>
