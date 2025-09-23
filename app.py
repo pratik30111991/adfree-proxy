@@ -1,60 +1,51 @@
-from flask import Flask, request, jsonify
+from flask import Flask, render_template, request, jsonify
 import requests
 from bs4 import BeautifulSoup
 
 app = Flask(__name__)
 
-# --- Multi-site scrapers ---
-def scrape_wapking(query):
-    try:
-        url = f"https://www.wapking.asia/search/{query.replace(' ', '-')}/"
-        headers = {"User-Agent": "Mozilla/5.0"}
-        r = requests.get(url, headers=headers, timeout=10)
-        soup = BeautifulSoup(r.text, "html.parser")
-        songs = []
-        for item in soup.select("div.song > a"):
-            title = item.text.strip()
-            link = item.get("href")
-            if link.startswith("/"):
-                link = "https://www.wapking.asia" + link
-            songs.append({"title": title, "link": link})
-        return songs
-    except Exception as e:
-        return []
+def youtube_search(query):
+    query = query.replace(' ', '+')
+    url = f"https://www.youtube.com/results?search_query={query}"
+    headers = {
+        "User-Agent": "Mozilla/5.0"
+    }
+    response = requests.get(url, headers=headers)
+    soup = BeautifulSoup(response.text, "html.parser")
+    results = []
 
-def scrape_jiosaavn(query):
-    try:
-        url = f"https://www.jiosaavn.com/search/{query.replace(' ', '%20')}"
-        headers = {"User-Agent": "Mozilla/5.0"}
-        r = requests.get(url, headers=headers, timeout=10)
-        soup = BeautifulSoup(r.text, "html.parser")
-        songs = []
-        for item in soup.select("a[data-type='song']"):
-            title = item.get("title")
-            link = item.get("href")
-            songs.append({"title": title, "link": link})
-        return songs
-    except Exception as e:
-        return []
+    for video in soup.find_all('a', href=True):
+        href = video['href']
+        if '/watch?v=' in href:
+            video_id = href.split('v=')[1].split('&')[0]
+            title = video.get('title')
+            if title:
+                thumbnail = f"https://img.youtube.com/vi/{video_id}/hqdefault.jpg"
+                results.append({
+                    "title": title,
+                    "videoId": video_id,
+                    "thumbnail": thumbnail
+                })
+    # Remove duplicates
+    seen = set()
+    unique_results = []
+    for r in results:
+        if r['videoId'] not in seen:
+            unique_results.append(r)
+            seen.add(r['videoId'])
+    return unique_results[:10]  # top 10 results
 
-# Add more site scrapers if needed
+@app.route('/')
+def index():
+    return render_template('index.html')
 
-# --- Main search endpoint ---
-@app.route("/search")
+@app.route('/search')
 def search():
-    query = request.args.get("q", "")
-    if not query:
-        return jsonify({"error": "Query parameter 'q' missing"}), 400
+    q = request.args.get('q', '')
+    if not q:
+        return jsonify([])
+    results = youtube_search(q)
+    return jsonify(results)
 
-    result = []
-    # Call each scraper
-    result += scrape_wapking(query)
-    result += scrape_jiosaavn(query)
-    # You can add more scrapers here
-
-    return jsonify(result)
-
-if __name__ == "__main__":
-    import os
-    port = int(os.environ.get("PORT", 10000))
-    app.run(host="0.0.0.0", port=port)
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000)
