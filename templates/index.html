@@ -1,45 +1,67 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>AdFree Music Player</title>
+  <meta charset="UTF-8">
+  <title>Ad-Free Music Player</title>
+  <style>
+    body { font-family: Arial, sans-serif; background:#111; color:#fff; text-align:center; }
+    #player { margin:20px auto; }
+    #results { margin-top:30px; display:flex; flex-direction:column; align-items:center; }
+    .song { margin:10px; padding:10px; border:1px solid #444; width:80%; cursor:pointer; }
+    .song:hover { background:#222; }
+    audio { width:80%; margin-top:15px; }
+    input[type=text]{ padding:10px; width:300px; }
+    button { padding:10px; margin-left:5px; }
+  </style>
 </head>
 <body>
-<h2>AdFree Music Player</h2>
-<input type="text" id="searchBox" placeholder="Search song">
-<button onclick="searchSong()">Search</button>
+  <h1>🎵 Ad-Free Music Player</h1>
+  <div>
+    <input type="text" id="query" placeholder="Search songs...">
+    <button onclick="searchSongs()">Search</button>
+  </div>
 
-<div id="playerDiv" style="margin-top:20px;">
-    <audio id="player" controls autoplay></audio>
-</div>
+  <div id="player">
+    <audio id="audioPlayer" controls autoplay></audio>
+  </div>
 
-<h3>Suggestions</h3>
-<div id="suggestions"></div>
+  <h2>Suggestions</h2>
+  <div id="results"></div>
 
 <script>
-async function searchSong() {
-    const query = document.getElementById("searchBox").value;
-    const res = await fetch(`/search?q=${encodeURIComponent(query)}`);
-    const data = await res.json();
+async function searchSongs() {
+  let query = document.getElementById("query").value;
+  if(!query) return;
 
-    const suggestionsDiv = document.getElementById("suggestions");
-    suggestionsDiv.innerHTML = "";
+  let res = await fetch(`/search?q=${encodeURIComponent(query)}`);
+  let data = await res.json();
 
-    if (data.length > 0) {
-        document.getElementById("player").src = data[0].url;
-        data.forEach(item => {
-            const div = document.createElement("div");
-            div.innerHTML = `<a href="#" onclick="playSong('${item.url}')">${item.title}</a>`;
-            suggestionsDiv.appendChild(div);
-        });
-    } else {
-        suggestionsDiv.innerHTML = "No songs found.";
-    }
+  let resultsDiv = document.getElementById("results");
+  resultsDiv.innerHTML = "";
+
+  if(data.error || !data.items) {
+    resultsDiv.innerHTML = "<p>No results found.</p>";
+    return;
+  }
+
+  data.items.forEach((song, index) => {
+    let div = document.createElement("div");
+    div.className = "song";
+    div.innerHTML = `
+      <b>${song.title}</b><br>
+      <small>${song.channel}</small>
+    `;
+    div.onclick = () => playSong(song.url);
+    resultsDiv.appendChild(div);
+
+    if(index === 0) playSong(song.url); // First song auto play
+  });
 }
 
 function playSong(url) {
-    const player = document.getElementById("player");
-    player.src = url;
-    player.play();
+  let player = document.getElementById("audioPlayer");
+  player.src = url;
+  player.play();
 }
 </script>
 </body>
