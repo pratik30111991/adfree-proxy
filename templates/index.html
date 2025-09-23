@@ -9,7 +9,7 @@
 <button onclick="searchSong()">Search</button>
 
 <div id="playerDiv" style="margin-top:20px;">
-    <audio id="player" controls></audio>
+    <audio id="player" controls autoplay></audio>
 </div>
 
 <h3>Suggestions</h3>
@@ -20,16 +20,15 @@ async function searchSong() {
     const query = document.getElementById("searchBox").value;
     const res = await fetch(`/search?q=${encodeURIComponent(query)}`);
     const data = await res.json();
-    
+
     const suggestionsDiv = document.getElementById("suggestions");
     suggestionsDiv.innerHTML = "";
-    
+
     if (data.length > 0) {
-        // First result play
         document.getElementById("player").src = data[0].url;
         data.forEach(item => {
             const div = document.createElement("div");
-            div.innerHTML = `<a href="#" onclick="playSong('${item.url}');return false;">${item.title}</a>`;
+            div.innerHTML = `<a href="#" onclick="playSong('${item.url}')">${item.title}</a>`;
             suggestionsDiv.appendChild(div);
         });
     } else {
