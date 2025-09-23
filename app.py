@@ -1,34 +1,46 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, render_template
 import requests
 from bs4 import BeautifulSoup
 
 app = Flask(__name__)
 
 BASE_URL = "https://wapking.sbs"
+HEADERS = {"User-Agent": "Mozilla/5.0"}
 
 def search_songs(query):
     results = []
-    # Wapking search URL
-    search_url = f"{BASE_URL}/search?q={query.replace(' ', '+')}"
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
-    }
+    search_url = f"{BASE_URL}/search.php?q={query.replace(' ', '+')}"
     try:
-        r = requests.get(search_url, headers=headers, timeout=10)
+        r = requests.get(search_url, headers=HEADERS, timeout=10)
         soup = BeautifulSoup(r.text, "html.parser")
 
-        # Pick results from Google Custom Search overlay
-        items = soup.select(".gsc-webResult .gs-title a")
-
-        for item in items:
+        # Get song page links
+        items = soup.select("div.list div.item a")
+        for item in items[:10]:
             title = item.get_text(strip=True)
-            url = item.get("href")
-            if not url:
+            page_url = item.get("href")
+            if not page_url.startswith("http"):
+                page_url = BASE_URL + page_url
+
+            # Open song page to extract actual audio url
+            try:
+                r2 = requests.get(page_url, headers=HEADERS, timeout=10)
+                s2 = BeautifulSoup(r2.text, "html.parser")
+                audio_tag = s2.find("audio")
+                if audio_tag and audio_tag.get("src"):
+                    song_url = audio_tag["src"]
+                    if not song_url.startswith("http"):
+                        song_url = BASE_URL + song_url
+                    results.append({"title": title, "url": song_url})
+            except:
                 continue
-            results.append({"title": title, "url": url})
-    except Exception as e:
-        print("Error:", e)
+    except:
+        pass
     return results
+
+@app.route("/")
+def index():
+    return render_template("index.html")
 
 @app.route("/search")
 def search():
