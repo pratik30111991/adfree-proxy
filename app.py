@@ -1,7 +1,6 @@
 from flask import Flask, render_template, request, jsonify
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.common.by import By
 from bs4 import BeautifulSoup
 import time
 
@@ -14,15 +13,15 @@ def youtube_search(query, max_results=10):
     options.add_argument("--disable-dev-shm-usage")
     options.add_argument("--disable-gpu")
     options.add_argument("--window-size=1920,1080")
-
+    
     driver = webdriver.Chrome(options=options)
     search_url = f"https://www.youtube.com/results?search_query={query.replace(' ', '+')}"
     driver.get(search_url)
-    time.sleep(3)  # wait for page to load dynamic content
-
+    time.sleep(3)  # wait for JS content to load
+    
     soup = BeautifulSoup(driver.page_source, "html.parser")
     driver.quit()
-
+    
     results = []
     for video in soup.find_all('a', href=True):
         href = video['href']
@@ -36,15 +35,14 @@ def youtube_search(query, max_results=10):
                     "videoId": video_id,
                     "thumbnail": thumbnail
                 })
-
-    # Remove duplicates
+    
     seen = set()
     unique_results = []
     for r in results:
         if r['videoId'] not in seen:
             unique_results.append(r)
             seen.add(r['videoId'])
-
+    
     return unique_results[:max_results]
 
 @app.route('/')
