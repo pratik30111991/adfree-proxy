@@ -4,7 +4,7 @@ from bs4 import BeautifulSoup
 
 app = Flask(__name__)
 
-def youtube_search(query):
+def youtube_search(query, max_results=10):
     query = query.replace(' ', '+')
     url = f"https://www.youtube.com/results?search_query={query}"
     headers = {
@@ -18,7 +18,8 @@ def youtube_search(query):
         href = video['href']
         if '/watch?v=' in href:
             video_id = href.split('v=')[1].split('&')[0]
-            title = video.get('title')
+            # fallback if title attribute is missing
+            title = video.get('title') or video.text.strip()
             if title:
                 thumbnail = f"https://img.youtube.com/vi/{video_id}/hqdefault.jpg"
                 results.append({
@@ -26,6 +27,7 @@ def youtube_search(query):
                     "videoId": video_id,
                     "thumbnail": thumbnail
                 })
+
     # Remove duplicates
     seen = set()
     unique_results = []
@@ -33,7 +35,8 @@ def youtube_search(query):
         if r['videoId'] not in seen:
             unique_results.append(r)
             seen.add(r['videoId'])
-    return unique_results[:10]  # top 10 results
+
+    return unique_results[:max_results]
 
 @app.route('/')
 def index():
