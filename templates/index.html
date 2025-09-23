@@ -18,17 +18,18 @@
 <script>
 async function searchSong() {
     const query = document.getElementById("searchBox").value;
-    const res = await fetch(`https://adfree-proxy.onrender.com/search?q=${encodeURIComponent(query)}`);
+    const res = await fetch(`/search?q=${encodeURIComponent(query)}`);
     const data = await res.json();
     
     const suggestionsDiv = document.getElementById("suggestions");
     suggestionsDiv.innerHTML = "";
     
-    if(data.length > 0){
+    if (data.length > 0) {
+        // First result play
         document.getElementById("player").src = data[0].url;
         data.forEach(item => {
             const div = document.createElement("div");
-            div.innerHTML = `<a href="#" onclick="playSong('${item.url}')">${item.title}</a>`;
+            div.innerHTML = `<a href="#" onclick="playSong('${item.url}');return false;">${item.title}</a>`;
             suggestionsDiv.appendChild(div);
         });
     } else {
@@ -36,7 +37,7 @@ async function searchSong() {
     }
 }
 
-function playSong(url){
+function playSong(url) {
     const player = document.getElementById("player");
     player.src = url;
     player.play();
